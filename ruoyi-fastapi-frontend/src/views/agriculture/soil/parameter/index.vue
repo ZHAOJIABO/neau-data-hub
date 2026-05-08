@@ -1,0 +1,81 @@
+<template>
+  <div class="app-container">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
+      <el-form-item label="数据来源" prop="source">
+        <el-select v-model="queryParams.source" placeholder="选择来源" clearable style="width: 200px">
+          <el-option label="k" value="k" />
+          <el-option label="k1" value="k1" />
+          <el-option label="k2" value="k2" />
+        </el-select>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
+    <el-row :gutter="10" class="mb8">
+      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
+    </el-row>
+
+    <el-table v-loading="loading" :data="dataList">
+      <el-table-column label="ID" prop="id" width="70" />
+      <el-table-column label="来源" prop="source" width="70" />
+      <el-table-column label="网格ID" prop="gridId" width="80" />
+      <el-table-column label="有机碳" prop="oc05" width="90" />
+      <el-table-column label="砂粒" prop="sand05" width="90" />
+      <el-table-column label="粘粒" prop="clay05" width="90" />
+      <el-table-column label="粉粒" prop="silt05" width="90" />
+      <el-table-column label="容重" prop="bulkDensity" width="90" />
+      <el-table-column label="K值" prop="kValue" width="100" />
+      <el-table-column label="含水量" prop="moistureContent" width="90" />
+      <el-table-column label="田间持水量" prop="fieldCapacity" width="110" />
+    </el-table>
+
+    <pagination
+      v-show="total > 0"
+      :total="total"
+      v-model:page="queryParams.pageNum"
+      v-model:limit="queryParams.pageSize"
+      @pagination="getList"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { listParameter } from '@/api/agriculture/soil'
+
+const loading = ref(false)
+const showSearch = ref(true)
+const dataList = ref([])
+const total = ref(0)
+const queryParams = ref({
+  pageNum: 1,
+  pageSize: 10,
+  source: undefined
+})
+
+function getList() {
+  loading.value = true
+  listParameter(queryParams.value).then(response => {
+    dataList.value = response.rows
+    total.value = response.total
+    loading.value = false
+  })
+}
+
+function handleQuery() {
+  queryParams.value.pageNum = 1
+  getList()
+}
+
+function resetQuery() {
+  queryParams.value = { pageNum: 1, pageSize: 10, source: undefined }
+  handleQuery()
+}
+
+onMounted(() => {
+  getList()
+})
+</script>
