@@ -11,6 +11,9 @@ RUN npm config set registry https://registry.npmmirror.com
 # 安装依赖
 RUN npm install
 
+# 增大 Node.js 内存限制，防止构建 OOM
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 # 执行docker构建命令
 RUN npm run build:docker
 
