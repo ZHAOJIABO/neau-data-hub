@@ -43,7 +43,10 @@ services:
     ports:
       - "15432:5432"
     volumes:
-      - ./ruoyi-fastapi-backend/sql/ruoyi-fastapi-pg.sql:/docker-entrypoint-initdb.d/ruoyi-fastapi-pg.sql
+      - ./ruoyi-fastapi-backend/sql/ruoyi-fastapi-pg.sql:/docker-entrypoint-initdb.d/01-ruoyi-fastapi-pg.sql
+      - ./scripts/datahub_database.sql:/docker-entrypoint-initdb.d/02-datahub_database.sql
+      - ./scripts/menu_insert.sql:/docker-entrypoint-initdb.d/03-menu_insert.sql
+      - pgdata:/var/lib/postgresql/data
     networks:
       - ruoyi-network
     healthcheck:
@@ -58,6 +61,8 @@ services:
     container_name: ruoyi-redis
     ports:
       - "16379:6379"
+    volumes:
+      - redisdata:/data
     networks:
       - ruoyi-network
     healthcheck:
@@ -71,3 +76,8 @@ networks:
   ruoyi-network:
     name: ruoyi-network
     driver: bridge
+
+# 数据持久化
+volumes:
+  pgdata:
+  redisdata:
