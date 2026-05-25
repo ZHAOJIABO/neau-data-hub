@@ -155,3 +155,5 @@ data/
 .opencode/
 .qoder/
 .trae/
+*.tar
+*.tar.gz

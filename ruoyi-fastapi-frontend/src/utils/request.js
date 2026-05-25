@@ -6,14 +6,6 @@ import { tansParams, blobValidate } from '@/utils/ruoyi'
 import cache from '@/plugins/cache'
 import { saveAs } from 'file-saver'
 import useUserStore from '@/store/modules/user'
-import {
-  decryptTransportErrorResponse,
-  decryptTransportResponse,
-  encryptTransportRequest,
-  invalidateTransportKeyMeta,
-  resetTransportRequestConfig,
-  shouldRetryTransportWithFreshKey
-} from '@/utils/transportCrypto'
 
 let downloadLoadingInstance;
 // 是否显示重新登录
@@ -35,7 +27,7 @@ const service = axios.create({
  * @returns {Promise<Object>} 最终发送的请求配置
  */
 // request拦截器
-service.interceptors.request.use(async config => {
+service.interceptors.request.use(config => {
   // 是否需要设置 token
   const isToken = (config.headers || {}).isToken === false
   // 是否需要防止数据重复提交
@@ -73,8 +65,6 @@ service.interceptors.request.use(async config => {
       }
     }
   }
-  // 在参数拼接前完成传输层加密，避免明文查询串提前写入 URL。
-  config = await encryptTransportRequest(config)
   // get请求映射params参数
   if (config.method === 'get' && config.params) {
     let url = config.url + '?' + tansParams(config.params);
@@ -96,8 +86,6 @@ service.interceptors.request.use(async config => {
  */
 // 响应拦截器
 service.interceptors.response.use(async res => {
-    // 响应若命中了传输层加密，这里先还原为原始业务 JSON。
-    res = await decryptTransportResponse(res)
     // 未设置状态码则默认成功状态
     const code = res.data.code || 200;
     // 获取错误信息
@@ -133,17 +121,6 @@ service.interceptors.response.use(async res => {
     }
   },
   async error => {
-    // 错误响应也可能是加密信封，先尝试解密再进入统一错误提示流程。
-    error = await decryptTransportErrorResponse(error)
-    // 若后端提示密钥失效，则清空本地公钥缓存并基于原始请求重试一次。
-    if (shouldRetryTransportWithFreshKey(error) && error.config && !error.config.__transportRetried) {
-      invalidateTransportKeyMeta()
-      error.config.__transportRetried = true
-      error.config.headers = error.config.headers || {}
-      error.config.headers.repeatSubmit = false
-      resetTransportRequestConfig(error.config)
-      return service.request(error.config)
-    }
     console.log('err' + error)
     const response = error.response
     const responseStatus = response?.status
@@ -181,7 +158,7 @@ export function download(url, params, filename, config) {
   downloadLoadingInstance = ElLoading.service({ text: "正在下载数据，请稍候", background: "rgba(0, 0, 0, 0.7)", })
   return service.post(url, params, {
     transformRequest: [(params) => { return tansParams(params) }],
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', encrypt: false, encryptResponse: false },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     responseType: 'blob',
     ...config
   }).then(async (data) => {
