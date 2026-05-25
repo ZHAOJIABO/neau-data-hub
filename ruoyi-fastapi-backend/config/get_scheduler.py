@@ -21,7 +21,6 @@ from redis import asyncio as aioredis
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-import module_task  # noqa: F401
 from common.constant import LockConstant
 from config.database import (
     SYNC_SQLALCHEMY_DATABASE_URL,
