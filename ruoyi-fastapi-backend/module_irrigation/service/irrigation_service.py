@@ -822,7 +822,9 @@ class IrrigationService:
 
     @classmethod
     def _get_reference_array(cls, first_day: dict[str, np.ndarray]) -> np.ndarray:
-        ref_arr = first_day.get('rain') or first_day.get('et0')
+        ref_arr = first_day.get('rain')
+        if ref_arr is None:
+            ref_arr = first_day.get('et0')
         if ref_arr is None:
             for var in cls.VAR_ORDER:
                 if var in first_day:

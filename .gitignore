@@ -159,3 +159,4 @@ data/
 *.tar.gz
 
 .codegraph/
+cache
