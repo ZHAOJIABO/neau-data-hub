@@ -99,6 +99,7 @@ service.interceptors.response.use(async res => {
     }
     // 未设置状态码则默认成功状态
     const code = res.data.code || 200;
+    const msg = errorCode[code] || res.data.msg || res.data.message || errorCode['default'];
     if (code === 401) {
       if (!isRelogin.show) {
         isRelogin.show = true;
