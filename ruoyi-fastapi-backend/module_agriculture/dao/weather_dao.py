@@ -1,3 +1,4 @@
+from math import ceil
 from typing import Any
 
 from sqlalchemy import delete, select, text
@@ -104,9 +105,8 @@ class WeatherDao:
             f'LIMIT {query_object.page_size} OFFSET {offset}'
         )
         result = await db.execute(data_sql)
-        rows = []
-        for row in result:
-            rows.append({
+        rows = [
+            {
                 'stationName': row[0],
                 'stcd': row[1],
                 'obsDate': str(row[2]) if row[2] else None,
@@ -117,11 +117,11 @@ class WeatherDao:
                 'precipitation': float(row[7]) if row[7] is not None else None,
                 'sunshineHours': float(row[8]) if row[8] is not None else None,
                 'windSpeed': float(row[9]) if row[9] is not None else None,
-            })
+            }
+            for row in result
+        ]
 
-        import math
-
-        has_next = math.ceil(total / query_object.page_size) > query_object.page_num if total else False
+        has_next = ceil(total / query_object.page_size) > query_object.page_num if total else False
 
         if is_page:
             return PageModel(

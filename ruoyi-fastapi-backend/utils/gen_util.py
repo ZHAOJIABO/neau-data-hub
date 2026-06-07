@@ -1,9 +1,10 @@
 import re
 from datetime import datetime
 
+from module_generator.entity.vo.gen_vo import GenTableColumnModel, GenTableModel
+
 from common.constant import GenConstant
 from config.env import GenConfig
-from module_generator.entity.vo.gen_vo import GenTableColumnModel, GenTableModel
 from utils.string_util import StringUtil
 
 

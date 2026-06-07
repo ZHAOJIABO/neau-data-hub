@@ -1,4 +1,3 @@
-from config.env import DataBaseConfig
 
 
 class CommonConstant:

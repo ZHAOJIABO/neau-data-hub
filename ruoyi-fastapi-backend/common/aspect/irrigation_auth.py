@@ -23,10 +23,13 @@ class IrrigationApiKey:
             raise AuthException(data='', message='API Key 无效')
 
 
-def IrrigationApiKeyDependency() -> params.Depends:
+def irrigation_api_key_dependency() -> params.Depends:
     """
     灌溉接口 API Key 认证依赖工厂函数
 
     :return: Irrigation API Key 认证依赖
     """
     return Depends(IrrigationApiKey())
+
+
+IrrigationApiKeyDependency = irrigation_api_key_dependency

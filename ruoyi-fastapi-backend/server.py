@@ -1,25 +1,26 @@
 import asyncio
-import os
+import shutil
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import anyio
 from fastapi import FastAPI
 
 from common.constant import LockConstant
 from common.router import auto_register_routers
-from config.env import AppConfig
+from config.env import AppConfig, IrrigationConfig
 from config.get_db import close_async_engine, init_create_table
 from config.get_redis import RedisUtil
 from config.get_scheduler import SchedulerUtil
 from exceptions.handle import handle_exception
 from middlewares.handle import handle_middleware
 from module_admin.service.log_service import LogAggregatorService
+from module_irrigation.service.irrigation_service import IrrigationService
 from sub_applications.handle import handle_sub_applications
 from utils.common_util import worship
 from utils.log_util import logger
 from utils.server_util import APIDocsUtil, IPUtil, StartupUtil
 from utils.transport_crypto_util import TransportKeyProvider
-from module_irrigation.service.irrigation_service import IrrigationService
 
 
 async def _start_background_tasks(app: FastAPI) -> None:
@@ -57,13 +58,10 @@ async def _stop_background_tasks(app: FastAPI) -> None:
     await RedisUtil.close_redis_pool(app)
     await SchedulerUtil.close_system_scheduler()
     await close_async_engine()
-    # 清理灌溉决策临时输出目录
-    import shutil as _shutil
-    from config.env import IrrigationConfig
     output_dir = IrrigationConfig.irrigation_output_dir
-    if os.path.exists(output_dir):
+    if await anyio.Path(output_dir).exists():
         try:
-            _shutil.rmtree(output_dir)
+            shutil.rmtree(output_dir)
         except Exception:
             pass
 

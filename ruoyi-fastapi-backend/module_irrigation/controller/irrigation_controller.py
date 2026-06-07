@@ -3,18 +3,17 @@ from typing import Annotated
 from fastapi import File, Form, UploadFile
 from fastapi.responses import FileResponse
 
-from common.aspect.irrigation_auth import IrrigationApiKeyDependency
+from common.aspect.irrigation_auth import irrigation_api_key_dependency
 from common.router import APIRouterPro
 from exceptions.exception import ServiceException
 from module_irrigation.service.irrigation_service import IrrigationService
 from utils.log_util import logger
 
-
 irrigation_controller = APIRouterPro(
     prefix='/api/v1/irrigation',
     order_num=20,
     tags=['灌溉决策'],
-    dependencies=[IrrigationApiKeyDependency()],
+    dependencies=[irrigation_api_key_dependency()],
 )
 
 
@@ -22,7 +21,7 @@ irrigation_controller = APIRouterPro(
     '/predict',
     summary='执行灌溉决策预测',
 )
-async def predict_irrigation( 
+async def predict_irrigation(
     start_date: Annotated[str, Form(description='预测起始日期，格式 YYYY-MM-DD')],
     weather_files: Annotated[list[UploadFile], File(description='气象 TIF 文件（固定命名格式，需一次性上传 15×7 个）')],
     observed_sm: Annotated[list[UploadFile] | None, File(description='实测土壤含水量 TIF 文件（可选）')] = None,

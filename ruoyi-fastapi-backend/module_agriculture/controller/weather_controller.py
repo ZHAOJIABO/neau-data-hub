@@ -8,7 +8,6 @@ from common.aspect.pre_auth import PreAuthDependency
 from common.router import APIRouterPro
 from common.vo import PageResponseModel, ResponseBaseModel
 from module_agriculture.entity.vo.weather_vo import (
-    DeleteWeatherModel,
     WeatherHumidityPageQueryModel,
     WeatherOverviewPageQueryModel,
     WeatherPrecipitationPageQueryModel,
