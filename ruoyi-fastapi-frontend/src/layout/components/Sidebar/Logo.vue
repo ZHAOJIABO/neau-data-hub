@@ -62,9 +62,8 @@ const getLogoTextColor = computed(() => {
 
 .sidebar-logo-container {
   position: relative;
-  height: 72px;
-  padding: 14px 18px;
-  background: linear-gradient(45deg, #ff6d4b 0%, #51c4d3 100%);
+  height: 65px;
+  padding: 14px 0px;
   border-bottom: 1px solid var(--hairline-color);
   overflow: hidden;
 
