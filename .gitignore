@@ -157,3 +157,5 @@ data/
 .trae/
 *.tar
 *.tar.gz
+
+.codegraph/

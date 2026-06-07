@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Response
-from fastapi.exceptions import HTTPException
+from fastapi.exceptions import HTTPException, RequestValidationError
 from pydantic_validation_decorator import FieldValidationError
 
 from exceptions.exception import (
@@ -57,6 +57,16 @@ def handle_exception(app: FastAPI) -> None:
     async def service_warning_handler(request: Request, exc: ServiceWarning) -> Response:
         logger.warning(exc.message)
         return ResponseUtil.failure(data=exc.data, msg=exc.message)
+
+    # 处理请求参数校验异常
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_exception_handler(request: Request, exc: RequestValidationError) -> Response:
+        logger.warning(
+            'Request validation failed: path={} errors={}',
+            request.url.path,
+            exc.errors(),
+        )
+        return ResponseUtil.failure(msg='请求参数校验失败', data=exc.errors())
 
     # 处理其他http请求异常
     @app.exception_handler(HTTPException)

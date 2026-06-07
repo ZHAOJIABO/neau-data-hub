@@ -91,8 +91,13 @@ const activeMenu = computed(() => {
       color: v-bind(getMenuTextColor);
       
       &.is-active {
-        color: var(--menu-active-text, #409eff);
-        background-color: var(--menu-hover, rgba(0, 0, 0, 0.06)) !important;
+        color: var(--sidebar-active-text, #409eff);
+        background-color: var(--sidebar-active-bg, rgba(0, 0, 0, 0.06)) !important;
+
+        .svg-icon,
+        .menu-title {
+          color: var(--sidebar-active-icon, currentColor) !important;
+        }
       }
     }
 

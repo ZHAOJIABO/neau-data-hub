@@ -1,4 +1,5 @@
 import asyncio
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -18,6 +19,7 @@ from utils.common_util import worship
 from utils.log_util import logger
 from utils.server_util import APIDocsUtil, IPUtil, StartupUtil
 from utils.transport_crypto_util import TransportKeyProvider
+from module_irrigation.service.irrigation_service import IrrigationService
 
 
 async def _start_background_tasks(app: FastAPI) -> None:
@@ -55,6 +57,15 @@ async def _stop_background_tasks(app: FastAPI) -> None:
     await RedisUtil.close_redis_pool(app)
     await SchedulerUtil.close_system_scheduler()
     await close_async_engine()
+    # 清理灌溉决策临时输出目录
+    import shutil as _shutil
+    from config.env import IrrigationConfig
+    output_dir = IrrigationConfig.irrigation_output_dir
+    if os.path.exists(output_dir):
+        try:
+            _shutil.rmtree(output_dir)
+        except Exception:
+            pass
 
 
 # 生命周期事件
@@ -96,6 +107,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await RedisUtil.init_sys_dict(app.state.redis)
         await RedisUtil.init_sys_config(app.state.redis)
         await _start_background_tasks(app)
+
+        # 启动时预加载灌溉决策模型
+        IrrigationService.load_models_inference_mode()
+        logger.info('灌溉决策模型加载完成')
 
     if startup_log_enabled:
         # 短暂等待确保下面的启动日志在最后打印

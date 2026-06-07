@@ -71,6 +71,19 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/irrigation',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/agriculture/irrigation/index.vue'),
+        name: 'IrrigationPredict',
+        meta: { title: '灌溉决策', icon: 'dashboard' }
+      }
+    ]
+  },
+  {
     path: '/user',
     component: Layout,
     hidden: true,

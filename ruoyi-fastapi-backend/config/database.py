@@ -13,13 +13,8 @@ def build_async_sqlalchemy_database_url() -> str:
 
     :return: 异步 SQLAlchemy 数据库连接 URL
     """
-    if DataBaseConfig.db_type == 'postgresql':
-        return (
-            f'postgresql+asyncpg://{DataBaseConfig.db_username}:{quote_plus(DataBaseConfig.db_password)}@'
-            f'{DataBaseConfig.db_host}:{DataBaseConfig.db_port}/{DataBaseConfig.db_database}'
-        )
     return (
-        f'mysql+asyncmy://{DataBaseConfig.db_username}:{quote_plus(DataBaseConfig.db_password)}@'
+        f'postgresql+asyncpg://{DataBaseConfig.db_username}:{quote_plus(DataBaseConfig.db_password)}@'
         f'{DataBaseConfig.db_host}:{DataBaseConfig.db_port}/{DataBaseConfig.db_database}'
     )
 
@@ -33,13 +28,8 @@ def build_sync_sqlalchemy_database_url() -> str:
 
     :return: 同步 SQLAlchemy 数据库连接 URL
     """
-    if DataBaseConfig.db_type == 'postgresql':
-        return (
-            f'postgresql+psycopg2://{DataBaseConfig.db_username}:{quote_plus(DataBaseConfig.db_password)}@'
-            f'{DataBaseConfig.db_host}:{DataBaseConfig.db_port}/{DataBaseConfig.db_database}'
-        )
     return (
-        f'mysql+pymysql://{DataBaseConfig.db_username}:{quote_plus(DataBaseConfig.db_password)}@'
+        f'postgresql+psycopg2://{DataBaseConfig.db_username}:{quote_plus(DataBaseConfig.db_password)}@'
         f'{DataBaseConfig.db_host}:{DataBaseConfig.db_port}/{DataBaseConfig.db_database}'
     )
 

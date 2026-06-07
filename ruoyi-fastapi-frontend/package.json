@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",
+    "@vueup/vue-quill": "1.2.0",
     "@vueuse/core": "14.1.0",
     "axios": "1.13.5",
     "clipboard": "2.0.11",
@@ -21,17 +22,19 @@
     "element-plus": "2.13.1",
     "file-saver": "2.0.5",
     "fuse.js": "7.1.0",
+    "geotiff": "^3.0.5",
     "js-cookie": "3.0.5",
     "jsencrypt": "3.3.2",
+    "jszip": "^3.10.1",
+    "leaflet": "^1.9.4",
     "nprogress": "0.2.0",
     "pinia": "3.0.4",
+    "splitpanes": "4.0.4",
     "uuid": "13.0.0",
     "vue": "3.5.26",
     "vue-cropper": "1.1.1",
     "vue-router": "4.6.4",
-    "vuedraggable": "4.1.0",
-    "splitpanes": "4.0.4",
-    "@vueup/vue-quill": "1.2.0"
+    "vuedraggable": "4.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "5.2.4",

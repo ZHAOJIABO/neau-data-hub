@@ -25,31 +25,29 @@ defineProps({
   }
 })
 
-const title = import.meta.env.VITE_APP_TITLE;
-const settingsStore = useSettingsStore();
-const sideTheme = computed(() => settingsStore.sideTheme);
+const title = import.meta.env.VITE_APP_TITLE
+const settingsStore = useSettingsStore()
+const sideTheme = computed(() => settingsStore.sideTheme)
 
-// 获取Logo背景色
 const getLogoBackground = computed(() => {
   if (settingsStore.isDark) {
-    return 'var(--sidebar-bg)';
+    return 'var(--sidebar-bg)'
   }
   if (settingsStore.navType == 3) {
     return variables.menuLightBg
   }
-  return sideTheme.value === 'theme-dark' ? variables.menuBg : variables.menuLightBg;
-});
+  return sideTheme.value === 'theme-dark' ? variables.menuBg : variables.menuLightBg
+})
 
-// 获取Logo文字颜色
 const getLogoTextColor = computed(() => {
   if (settingsStore.isDark) {
-    return 'var(--sidebar-text)';
+    return 'var(--logo-accent-text)'
   }
   if (settingsStore.navType == 3) {
-    return variables.menuLightText
+    return 'var(--logo-accent-text)'
   }
-  return sideTheme.value === 'theme-dark' ? '#fff' : variables.menuLightText;
-});
+  return 'var(--logo-accent-text)'
+})
 </script>
 
 <style lang="scss" scoped>
@@ -64,38 +62,56 @@ const getLogoTextColor = computed(() => {
 
 .sidebar-logo-container {
   position: relative;
-  height: 50px;
-  line-height: 50px;
-  background: v-bind(getLogoBackground);
-  text-align: center;
+  height: 72px;
+  padding: 14px 18px;
+  background: linear-gradient(45deg, #ff6d4b 0%, #51c4d3 100%);
+  border-bottom: 1px solid var(--hairline-color);
   overflow: hidden;
 
   & .sidebar-logo-link {
     height: 100%;
     width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    border-radius: 5px;
+    padding: 5px 14px;
 
     & .sidebar-logo {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       vertical-align: middle;
       margin-right: 12px;
+      border-radius: 12px;
+      flex-shrink: 0;
     }
 
     & .sidebar-title {
       display: inline-block;
       margin: 0;
-      color: v-bind(getLogoTextColor);
+      color: var(--logo-accent-text);
       font-weight: 600;
-      line-height: 50px;
-      font-size: 14px;
-      font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
+      line-height: 1.2;
+      font-size: 15px;
+      font-family: var(--font-family-sans);
       vertical-align: middle;
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
 
   &.collapse {
+    padding: 14px 10px;
+
+    .sidebar-logo-link {
+      justify-content: center;
+      padding: 0;
+    }
+
     .sidebar-logo {
-      margin-right: 0px;
+      margin-right: 0;
     }
   }
 }

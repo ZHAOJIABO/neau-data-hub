@@ -44,14 +44,14 @@ class JwtSettings(BaseSettings):
 
 class DataBaseSettings(BaseSettings):
     """
-    数据库配置
+    PostgreSQL数据库配置
     """
 
-    db_type: Literal['mysql', 'postgresql'] = 'mysql'
+    db_type: Literal['postgresql'] = 'postgresql'
     db_host: str = '127.0.0.1'
-    db_port: int = 3306
-    db_username: str = 'root'
-    db_password: str = 'mysqlroot'
+    db_port: int = 5432
+    db_username: str = 'postgres'
+    db_password: str = 'root'
     db_database: str = 'ruoyi-fastapi'
     db_echo: bool = True
     db_max_overflow: int = 10
@@ -62,9 +62,7 @@ class DataBaseSettings(BaseSettings):
     @computed_field
     @property
     def sqlglot_parse_dialect(self) -> str:
-        if self.db_type == 'postgresql':
-            return 'postgres'
-        return self.db_type
+        return 'postgres'
 
 
 class RedisSettings(BaseSettings):
@@ -217,6 +215,18 @@ class CachePathConfig:
     PATHSTR = 'caches'
 
 
+class IrrigationApiKeySettings(BaseSettings):
+    """
+    灌溉决策接口配置
+    """
+
+    irrigation_api_key: str = 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
+    irrigation_model_dir: str = 'models'
+    irrigation_rl_model_path: str = 'models'
+    irrigation_output_dir: str = 'caches/irrigation_output'
+    irrigation_device: str = 'cpu'
+
+
 class GetConfig:
     """
     获取配置
@@ -332,3 +342,5 @@ TransportCryptoConfig = get_config.get_transport_crypto_config()
 GenConfig = get_config.get_gen_config()
 # 上传配置
 UploadConfig = get_config.get_upload_config()
+# 灌溉接口配置
+IrrigationConfig = IrrigationApiKeySettings()

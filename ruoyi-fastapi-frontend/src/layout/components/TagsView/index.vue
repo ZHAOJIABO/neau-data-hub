@@ -5,7 +5,7 @@
         v-for="tag in visitedViews"
         :key="tag.path"
         :data-path="tag.path"
-        :class="{ 'active': isActive(tag), 'has-icon': tagsIcon }"
+        :class="{ active: isActive(tag), 'has-icon': tagsIcon }"
         :to="{ path: tag.path, query: tag.query, fullPath: tag.fullPath }"
         class="tags-view-item"
         :style="activeStyle(tag)"
@@ -49,20 +49,20 @@ import useTagsViewStore from '@/store/modules/tagsView'
 import useSettingsStore from '@/store/modules/settings'
 import usePermissionStore from '@/store/modules/permission'
 
-const visible = ref(false);
-const top = ref(0);
-const left = ref(0);
-const selectedTag = ref({});
-const affixTags = ref([]);
-const scrollPaneRef = ref(null);
+const visible = ref(false)
+const top = ref(0)
+const left = ref(0)
+const selectedTag = ref({})
+const affixTags = ref([])
+const scrollPaneRef = ref(null)
 
-const { proxy } = getCurrentInstance();
-const route = useRoute();
-const router = useRouter();
+const { proxy } = getCurrentInstance()
+const route = useRoute()
+const router = useRouter()
 
-const visitedViews = computed(() => useTagsViewStore().visitedViews);
-const routes = computed(() => usePermissionStore().routes);
-const theme = computed(() => useSettingsStore().theme);
+const visitedViews = computed(() => useTagsViewStore().visitedViews)
+const routes = computed(() => usePermissionStore().routes)
+const theme = computed(() => useSettingsStore().theme)
 const tagsIcon = computed(() => useSettingsStore().tagsIcon)
 
 watch(route, () => {
@@ -85,11 +85,11 @@ function isActive(r) {
   return r.path === route.path
 }
 function activeStyle(tag) {
-  if (!isActive(tag)) return {};
+  if (!isActive(tag)) return {}
   return {
-    "background-color": theme.value,
-    "border-color": theme.value
-  };
+    'background-color': theme.value,
+    'border-color': theme.value
+  }
 }
 function isAffix(tag) {
   return tag.meta && tag.meta.affix
@@ -110,7 +110,7 @@ function isLastView() {
 }
 function filterAffixTags(routes, basePath = '') {
   let tags = []
-  routes.forEach(route => {
+  routes.forEach((route) => {
     if (route.meta && route.meta.affix) {
       const tagPath = getNormalPath(basePath + '/' + route.path)
       tags.push({
@@ -130,12 +130,11 @@ function filterAffixTags(routes, basePath = '') {
   return tags
 }
 function initTags() {
-  const res = filterAffixTags(routes.value);
-  affixTags.value = res;
+  const res = filterAffixTags(routes.value)
+  affixTags.value = res
   for (const tag of res) {
-    // Must have tag name
     if (tag.name) {
-       useTagsViewStore().addVisitedView(tag)
+      useTagsViewStore().addVisitedView(tag)
     }
   }
 }
@@ -149,8 +148,7 @@ function moveToCurrentTag() {
   nextTick(() => {
     for (const r of visitedViews.value) {
       if (r.path === route.path) {
-        scrollPaneRef.value.moveToTarget(r);
-        // when query is different then update
+        scrollPaneRef.value.moveToTarget(r)
         if (r.fullPath !== route.fullPath) {
           useTagsViewStore().updateVisitedView(route)
         }
@@ -159,9 +157,9 @@ function moveToCurrentTag() {
   })
 }
 function refreshSelectedTag(view) {
-  proxy.$tab.refreshPage(view);
+  proxy.$tab.refreshPage(view)
   if (route.meta.link) {
-    useTagsViewStore().delIframeView(route);
+    useTagsViewStore().delIframeView(route)
   }
 }
 function closeSelectedTag(view) {
@@ -172,28 +170,28 @@ function closeSelectedTag(view) {
   })
 }
 function closeRightTags() {
-  proxy.$tab.closeRightPage(selectedTag.value).then(visitedViews => {
-    if (!visitedViews.find(i => i.fullPath === route.fullPath)) {
+  proxy.$tab.closeRightPage(selectedTag.value).then((visitedViews) => {
+    if (!visitedViews.find((i) => i.fullPath === route.fullPath)) {
       toLastView(visitedViews)
     }
   })
 }
 function closeLeftTags() {
-  proxy.$tab.closeLeftPage(selectedTag.value).then(visitedViews => {
-    if (!visitedViews.find(i => i.fullPath === route.fullPath)) {
+  proxy.$tab.closeLeftPage(selectedTag.value).then((visitedViews) => {
+    if (!visitedViews.find((i) => i.fullPath === route.fullPath)) {
       toLastView(visitedViews)
     }
   })
 }
 function closeOthersTags() {
-  router.push(selectedTag.value).catch(() => { });
+  router.push(selectedTag.value).catch(() => { })
   proxy.$tab.closeOtherPage(selectedTag.value).then(() => {
     moveToCurrentTag()
   })
 }
 function closeAllTags(view) {
   proxy.$tab.closeAllPage().then(({ visitedViews }) => {
-    if (affixTags.value.some(tag => tag.path === route.path)) {
+    if (affixTags.value.some((tag) => tag.path === route.path)) {
       return
     }
     toLastView(visitedViews, view)
@@ -203,23 +201,18 @@ function toLastView(visitedViews, view) {
   const latestView = visitedViews.slice(-1)[0]
   if (latestView) {
     router.push(latestView.fullPath)
+  } else if (view.name === 'Dashboard') {
+    router.replace({ path: '/redirect' + view.fullPath })
   } else {
-    // now the default is to redirect to the home page if there is no tags-view,
-    // you can adjust it according to your needs.
-    if (view.name === 'Dashboard') {
-      // to reload home page
-      router.replace({ path: '/redirect' + view.fullPath })
-    } else {
-      router.push('/')
-    }
+    router.push('/')
   }
 }
 function openMenu(tag, e) {
-  const menuMinWidth = 105
-  const offsetLeft = proxy.$el.getBoundingClientRect().left // container margin left
-  const offsetWidth = proxy.$el.offsetWidth // container width
-  const maxLeft = offsetWidth - menuMinWidth // left boundary
-  const l = e.clientX - offsetLeft + 15 // 15: margin right
+  const menuMinWidth = 120
+  const offsetLeft = proxy.$el.getBoundingClientRect().left
+  const offsetWidth = proxy.$el.offsetWidth
+  const maxLeft = offsetWidth - menuMinWidth
+  const l = e.clientX - offsetLeft + 15
 
   if (l > maxLeft) {
     left.value = maxLeft
@@ -241,48 +234,62 @@ function handleScroll() {
 
 <style lang="scss" scoped>
 .tags-view-container {
-  height: 34px;
+  height: 48px;
   width: 100%;
   background: var(--tags-bg, #fff);
   border-bottom: 1px solid var(--tags-item-border, #d8dce5);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .12), 0 0 3px 0 rgba(0, 0, 0, .04);
+  backdrop-filter: blur(12px);
+
   .tags-view-wrapper {
+    padding: 6px 10px;
+
     .tags-view-item {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       position: relative;
       cursor: pointer;
-      height: 26px;
-      line-height: 26px;
+      height: 34px;
+      line-height: 34px;
       border: 1px solid var(--tags-item-border, #d8dce5);
       color: var(--tags-item-text, #495060);
       background: var(--tags-item-bg, #fff);
-      padding: 0 8px;
-      font-size: 12px;
-      margin-left: 5px;
-      margin-top: 4px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 9999px;
+      margin-left: 8px;
+      transition: all .2s ease;
 
       &:first-of-type {
-        margin-left: 15px;
+        margin-left: 0;
       }
 
       &:last-of-type {
-        margin-right: 15px;
+        margin-right: 10px;
+      }
+
+      &:hover {
+        background: var(--tags-item-hover, #eee);
+        color: var(--text-primary);
+        border-color: var(--text-primary);
       }
 
       &.active {
-        background-color: #42b983;
-        color: #fff;
-        border-color: #42b983;
+        color: var(--brand-on-primary);
+        border-color: var(--brand-primary);
+        box-shadow: var(--content-shadow-soft);
 
         &::before {
           content: '';
-          background: #fff;
+          background: currentColor;
           display: inline-block;
           width: 8px;
           height: 8px;
           border-radius: 50%;
           position: relative;
-          margin-right: 5px;
+          margin-right: 2px;
+          flex-shrink: 0;
         }
       }
     }
@@ -298,18 +305,22 @@ function handleScroll() {
     z-index: 3000;
     position: absolute;
     list-style-type: none;
-    padding: 5px 0;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 400;
+    padding: 8px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
     color: var(--tags-item-text, #333);
-    box-shadow: 2px 2px 3px 0 rgba(0, 0, 0, .3);
+    box-shadow: var(--content-shadow-soft);
     border: 1px solid var(--el-border-color-light, #e4e7ed);
 
     li {
       margin: 0;
-      padding: 7px 16px;
+      padding: 9px 16px;
       cursor: pointer;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
 
       &:hover {
         background: var(--tags-item-hover, #eee);
@@ -320,7 +331,6 @@ function handleScroll() {
 </style>
 
 <style lang="scss">
-//reset element css of el-icon-close
 .tags-view-wrapper {
   .tags-view-item {
     .el-icon-close {

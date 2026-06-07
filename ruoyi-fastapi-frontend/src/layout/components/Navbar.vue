@@ -12,7 +12,6 @@
       <template v-if="appStore.device !== 'mobile'">
         <header-search id="header-search" class="right-menu-item" />
 
-
         <screenfull id="screenfull" class="right-menu-item hover-effect" />
 
         <el-tooltip content="主题模式" effect="dark" placement="bottom">
@@ -38,8 +37,8 @@
               <el-dropdown-item>个人中心</el-dropdown-item>
             </router-link>
             <el-dropdown-item command="setLayout" v-if="settingsStore.showSettings">
-                <span>布局设置</span>
-              </el-dropdown-item>
+              <span>布局设置</span>
+            </el-dropdown-item>
             <el-dropdown-item divided command="logout">
               <span>退出登录</span>
             </el-dropdown-item>
@@ -74,10 +73,10 @@ function toggleSideBar() {
 
 function handleCommand(command) {
   switch (command) {
-    case "setLayout":
+    case 'setLayout':
       setLayout()
       break
-    case "logout":
+    case 'logout':
       logout()
       break
     default:
@@ -107,7 +106,7 @@ async function toggleTheme(event) {
   const y = event?.clientY || window.innerHeight / 2
   const wasDark = settingsStore.isDark
 
-  const isReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  const isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const isSupported = document.startViewTransition && !isReducedMotion
 
   if (!isSupported) {
@@ -130,14 +129,14 @@ async function toggleTheme(event) {
         clipPath: !wasDark ? [...clipPath].reverse() : clipPath
       }, {
         duration: 650,
-        easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-        fill: "forwards",
-        pseudoElement: !wasDark ? "::view-transition-old(root)" : "::view-transition-new(root)"
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        fill: 'forwards',
+        pseudoElement: !wasDark ? '::view-transition-old(root)' : '::view-transition-new(root)'
       }
     )
     await transition.finished
   } catch (error) {
-    console.warn("View transition failed, falling back to immediate toggle:", error)
+    console.warn('View transition failed, falling back to immediate toggle:', error)
     settingsStore.toggleTheme()
   }
 }
@@ -151,29 +150,32 @@ async function toggleTheme(event) {
 }
 
 .navbar {
-  height: 50px;
+  height: 64px;
   overflow: hidden;
   position: relative;
   background: var(--navbar-bg);
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--hairline-color);
   display: flex;
   align-items: center;
-  // padding: 0 8px;
   box-sizing: border-box;
+  padding: 0 20px;
 
   .hamburger-container {
-    line-height: 46px;
-    height: 100%;
+    width: 40px;
+    height: 40px;
     cursor: pointer;
     transition: background 0.3s;
     -webkit-tap-highlight-color: transparent;
     display: flex;
     align-items: center;
+    justify-content: center;
     flex-shrink: 0;
-    margin-right: 8px;
+    margin-right: 12px;
+    border-radius: 9999px;
 
     &:hover {
-      background: rgba(0, 0, 0, 0.025);
+      background: var(--navbar-hover);
     }
   }
 
@@ -183,7 +185,7 @@ async function toggleTheme(event) {
 
   .topmenu-container {
     position: absolute;
-    left: 50px;
+    left: 72px;
   }
 
   .topbar-container {
@@ -202,9 +204,9 @@ async function toggleTheme(event) {
 
   .right-menu {
     height: 100%;
-    line-height: 50px;
     display: flex;
     align-items: center;
+    gap: 6px;
     margin-left: auto;
 
     &:focus {
@@ -212,69 +214,63 @@ async function toggleTheme(event) {
     }
 
     .right-menu-item {
-      display: inline-block;
-      padding: 0 8px;
-      height: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      height: 40px;
+      min-width: 40px;
       font-size: 18px;
-      color: #5a5e66;
-      vertical-align: text-bottom;
+      color: var(--text-regular);
+      vertical-align: middle;
+      border-radius: 9999px;
+      transition: background-color .2s ease, color .2s ease, transform .2s ease;
 
       &.hover-effect {
         cursor: pointer;
-        transition: background 0.3s;
 
         &:hover {
-          background: rgba(0, 0, 0, 0.025);
+          background: var(--navbar-hover);
+          color: var(--navbar-text);
+          transform: translateY(-1px);
         }
       }
 
       &.theme-switch-wrapper {
-        display: flex;
-        align-items: center;
-
         svg {
           transition: transform 0.3s;
-          
+
           &:hover {
-            transform: scale(1.15);
+            transform: scale(1.08);
           }
         }
       }
     }
 
     .avatar-container {
-      margin-right: 0px;
-      padding-right: 0px;
+      margin-right: 0;
+      padding-right: 10px;
+      padding-left: 10px;
 
       .avatar-wrapper {
-        margin-top: 10px;
-        right: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
         position: relative;
 
         .user-avatar {
           cursor: pointer;
-          width: 30px;
-          height: 30px;
-          margin-right: 8px;
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
-          vertical-align: middle;
-          border-style: none;
+          border: 1px solid var(--hairline-color);
+          box-shadow: var(--content-shadow-soft);
         }
 
-        .user-nickname{
-          position: relative;
-          left: 0px;
-          // bottom: 10px;
+        .user-nickname {
           font-size: 14px;
-          font-weight: bold;
-        }
-
-        i {
-          cursor: pointer;
-          position: absolute;
-          right: -20px;
-          top: 25px;
-          font-size: 12px;
+          font-weight: 600;
+          color: var(--text-primary);
         }
       }
     }

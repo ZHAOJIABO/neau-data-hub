@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from sqlalchemy import CHAR, BigInteger, Column, DateTime, Integer, SmallInteger, String
-from sqlalchemy.dialects import mysql
 
 from config.database import Base
 from config.env import DataBaseConfig
@@ -27,13 +26,13 @@ class SysRole(Base):
         comment='数据范围（1：全部数据权限 2：自定数据权限 3：本部门数据权限 4：本部门及以下数据权限）',
     )
     menu_check_strictly = Column(
-        mysql.TINYINT(display_width=1) if DataBaseConfig.db_type == 'mysql' else SmallInteger,
+        SmallInteger,
         nullable=True,
         server_default='1',
         comment='菜单树选择项是否关联显示',
     )
     dept_check_strictly = Column(
-        mysql.TINYINT(display_width=1) if DataBaseConfig.db_type == 'mysql' else SmallInteger,
+        SmallInteger,
         nullable=True,
         server_default='1',
         comment='部门树选择项是否关联显示',

@@ -21,12 +21,11 @@ import useAppStore from '@/store/modules/app'
 import useSettingsStore from '@/store/modules/settings'
 
 const settingsStore = useSettingsStore()
-const theme = computed(() => settingsStore.theme);
-const sideTheme = computed(() => settingsStore.sideTheme);
-const sidebar = computed(() => useAppStore().sidebar);
-const device = computed(() => useAppStore().device);
-const needTagsView = computed(() => settingsStore.tagsView);
-const fixedHeader = computed(() => settingsStore.fixedHeader);
+const theme = computed(() => settingsStore.theme)
+const sidebar = computed(() => useAppStore().sidebar)
+const device = computed(() => useAppStore().device)
+const needTagsView = computed(() => settingsStore.tagsView)
+const fixedHeader = computed(() => settingsStore.fixedHeader)
 
 const classObj = computed(() => ({
   hideSidebar: !sidebar.value.opened,
@@ -35,8 +34,8 @@ const classObj = computed(() => ({
   mobile: device.value === 'mobile'
 }))
 
-const { width, height } = useWindowSize();
-const WIDTH = 992; // refer to Bootstrap's responsive design
+const { width } = useWindowSize()
+const WIDTH = 992
 
 watch(() => device.value, () => {
   if (device.value === 'mobile' && sidebar.value.opened) {
@@ -57,9 +56,9 @@ function handleClickOutside() {
   useAppStore().closeSideBar({ withoutAnimation: false })
 }
 
-const settingRef = ref(null);
+const settingRef = ref(null)
 function setLayout() {
-  settingRef.value.openSetting();
+  settingRef.value.openSetting()
 }
 </script>
 
@@ -70,8 +69,9 @@ function setLayout() {
 .app-wrapper {
   @include mix.clearfix;
   position: relative;
-  height: 100%;
+  min-height: 100%;
   width: 100%;
+  background: var(--page-bg);
 
   &.mobile.openSidebar {
     position: fixed;
@@ -85,13 +85,13 @@ function setLayout() {
 }
 
 .drawer-bg {
-  background: #000;
-  opacity: 0.3;
+  background: rgba(10, 10, 10, 0.45);
   width: 100%;
   top: 0;
   height: 100%;
   position: absolute;
   z-index: 999;
+  backdrop-filter: blur(4px);
 }
 
 .fixed-header {
@@ -104,7 +104,7 @@ function setLayout() {
 }
 
 .hideSidebar .fixed-header {
-  width: calc(100% - 54px);
+  width: calc(100% - 64px);
 }
 
 .sidebarHide .fixed-header {

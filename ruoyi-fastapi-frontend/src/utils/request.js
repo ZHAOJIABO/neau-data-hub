@@ -86,14 +86,19 @@ service.interceptors.request.use(config => {
  */
 // 响应拦截器
 service.interceptors.response.use(async res => {
-    // 未设置状态码则默认成功状态
-    const code = res.data.code || 200;
-    // 获取错误信息
-    const msg = errorCode[code] || res.data.msg || errorCode['default']
-    // 二进制数据则直接返回
+    // 二进制数据优先处理，避免把 blob 当成 JSON 业务响应
     if (res.request.responseType ===  'blob' || res.request.responseType ===  'arraybuffer') {
+      const contentType = res.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        const text = await new Blob([res.data]).text()
+        const payload = JSON.parse(text)
+        return Promise.reject(new Error(payload.msg || payload.message || errorCode['default']))
+      }
+      res.data.headers = res.headers
       return res.data
     }
+    // 未设置状态码则默认成功状态
+    const code = res.data.code || 200;
     if (code === 401) {
       if (!isRelogin.show) {
         isRelogin.show = true;

@@ -51,7 +51,6 @@ _PROVIDER_REGISTRY: dict[str, tuple[str, str]] = {
 
 # 存储引擎名称 -> (模块路径, 类名) 的映射
 _STORAGE_ENGINE_REGISTRY: dict[str, tuple[str, str]] = {
-    'mysql': ('agno.db.mysql', 'AsyncMySQLDb'),
     'postgresql': ('agno.db.postgres', 'AsyncPostgresDb'),
 }
 
@@ -95,8 +94,7 @@ class AiUtil:
             return _storage_class_cache[db_type]
         entry = _STORAGE_ENGINE_REGISTRY.get(db_type)
         if entry is None:
-            # 默认使用MySQL
-            entry = _STORAGE_ENGINE_REGISTRY['mysql']
+            raise ValueError(f'Unsupported database type: {db_type}')
         module_path, class_name = entry
         storage_cls = getattr(import_module(module_path), class_name)
         _storage_class_cache[db_type] = storage_cls
@@ -113,7 +111,7 @@ class AiUtil:
 
         return storage_engine_class(
             db_engine=async_engine,
-            db_schema=DataBaseConfig.db_database if DataBaseConfig.db_type == 'mysql' else 'public',
+            db_schema='public',
             session_table='ai_sessions',
             memory_table='ai_memories',
             metrics_table='ai_metrics',

@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from sqlalchemy import CHAR, Column, DateTime, Integer, LargeBinary, String
-from sqlalchemy.dialects import mysql
 
 from config.database import Base
 from config.env import DataBaseConfig
@@ -20,7 +19,7 @@ class SysNotice(Base):
     notice_title = Column(String(50), nullable=False, comment='公告标题')
     notice_type = Column(CHAR(1), nullable=False, comment='公告类型（1通知 2公告）')
     notice_content = Column(
-        mysql.LONGBLOB if DataBaseConfig.db_type == 'mysql' else LargeBinary,
+        LargeBinary,
         nullable=True,
         server_default=SqlalchemyUtil.get_server_default_null(DataBaseConfig.db_type, False),
         comment='公告内容',

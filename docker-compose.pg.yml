@@ -24,6 +24,8 @@ services:
     container_name: ruoyi-backend-pg
     ports:
       - "19099:9099"
+    volumes:
+      - ./ruoyi-fastapi-backend/models:/app/models
     depends_on:
       ruoyi-pg:
         condition: service_healthy

@@ -2,11 +2,17 @@
 
 .el-breadcrumb__inner,
 .el-breadcrumb__inner a {
-  font-weight: 400 !important;
+  font-weight: 500 !important;
+  color: var(--text-regular) !important;
+}
+
+.el-breadcrumb__inner.is-link:hover,
+.el-breadcrumb__inner a:hover {
+  color: var(--text-primary) !important;
 }
 
 .el-upload {
-  input[type="file"] {
+  input[type='file'] {
     display: none !important;
   }
 }
@@ -17,7 +23,7 @@
 
 .cell {
   .el-tag {
-    margin-right: 0px;
+    margin-right: 0;
   }
 }
 
@@ -41,20 +47,22 @@
     text-align: center;
 
     .el-tag {
-      margin-right: 0px;
+      margin-right: 0;
     }
   }
 }
 
-// to fixed https://github.com/ElemeFE/element/issues/2461
 .el-dialog {
   transform: none;
   left: 0;
   position: relative;
-  margin: 0 auto;
+  margin: 6vh auto 0;
+  border-radius: 24px;
+  border: 1px solid var(--hairline-color);
+  box-shadow: var(--content-shadow);
+  overflow: hidden;
 }
 
-// refine element ui upload
 .upload-container {
   .el-upload {
     width: 100%;
@@ -62,35 +70,146 @@
     .el-upload-dragger {
       width: 100%;
       height: 200px;
+      border-radius: 20px;
+      border: 1px dashed var(--hairline-color);
+      background: var(--surface-soft-bg);
     }
   }
 }
 
-// dropdown
 .el-dropdown-menu {
+  padding: 8px;
+  border-radius: 20px;
+  border: 1px solid var(--hairline-color);
+  box-shadow: var(--content-shadow-soft);
+
   a {
-    display: block
+    display: block;
   }
 }
 
-// fix date-picker ui bug in filter-item
+.el-dropdown-menu__item {
+  min-width: 140px;
+  border-radius: 9999px;
+  color: var(--text-regular);
+  font-weight: 500;
+
+  &:not(.is-disabled):hover,
+  &:not(.is-disabled):focus {
+    background: var(--surface-soft-bg);
+    color: var(--text-primary);
+  }
+}
+
 .el-range-editor.el-input__inner {
   display: inline-flex !important;
 }
 
-// to fix el-date-picker css style
 .el-range-separator {
   box-sizing: content-box;
 }
 
-.el-menu--collapse
-  > div
-  > .el-submenu
-  > .el-submenu__title
-  .el-submenu__icon-arrow {
+.el-menu--collapse > div > .el-submenu > .el-submenu__title .el-submenu__icon-arrow {
   display: none;
 }
 
-.el-dropdown .el-dropdown-link{
+.el-dropdown .el-dropdown-link {
   color: var(--el-color-primary) !important;
+}
+
+.el-button {
+  --el-button-font-weight: 600;
+  min-height: 40px;
+  border-radius: 9999px;
+  padding: 11px 24px;
+  transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease, border-color .2s ease, color .2s ease;
+
+  &:not(.is-disabled):hover {
+    transform: translateY(-1px);
+  }
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--brand-primary);
+  --el-button-border-color: var(--brand-primary);
+  --el-button-text-color: var(--brand-on-primary);
+  --el-button-hover-bg-color: var(--brand-primary-soft);
+  --el-button-hover-border-color: var(--brand-primary-soft);
+  --el-button-active-bg-color: var(--brand-primary-soft);
+  --el-button-active-border-color: var(--brand-primary-soft);
+  box-shadow: var(--content-shadow-soft);
+}
+
+.el-button--default,
+.el-button--info {
+  --el-button-bg-color: var(--control-bg);
+  --el-button-border-color: var(--control-border);
+  --el-button-text-color: var(--control-text);
+  --el-button-hover-bg-color: var(--control-bg-hover);
+  --el-button-hover-border-color: var(--control-border);
+  --el-button-hover-text-color: var(--control-text);
+  --el-button-active-bg-color: var(--control-bg-hover);
+  --el-button-active-border-color: var(--control-border);
+}
+
+.el-button--success,
+.el-button--warning,
+.el-button--danger {
+  box-shadow: none;
+}
+
+.el-button.is-plain {
+  --el-button-hover-bg-color: var(--brand-primary);
+  --el-button-hover-border-color: var(--brand-primary);
+  --el-button-hover-text-color: var(--brand-on-primary);
+}
+
+.el-card {
+  --el-card-border-color: var(--hairline-color);
+  border-radius: 16px;
+  border: 1px solid var(--hairline-color);
+  box-shadow: var(--content-shadow-soft);
+  background: var(--surface-bg);
+}
+
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper,
+.el-date-editor.el-input__wrapper,
+.el-date-editor .el-input__wrapper {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--hairline-color) inset !important;
+  background: var(--surface-bg);
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-date-editor.el-input__wrapper.is-focus,
+.el-date-editor .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 2px var(--brand-blue) inset !important;
+}
+
+.el-textarea__inner {
+  min-height: 40px;
+}
+
+.el-table {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--hairline-color);
+  --el-table-header-bg-color: var(--surface-soft-bg);
+  --el-table-row-hover-bg-color: var(--surface-soft-bg);
+
+  th {
+    font-weight: 600;
+    color: var(--text-regular);
+  }
+}
+
+.el-pagination {
+  .btn-next,
+  .btn-prev,
+  .number {
+    border-radius: 9999px;
+  }
 }
