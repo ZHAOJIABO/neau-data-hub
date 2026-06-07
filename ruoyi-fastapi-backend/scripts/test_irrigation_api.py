@@ -6,7 +6,7 @@ from pathlib import Path
 
 import requests
 
-DEFAULT_URL = 'http://8.146.227.98/api/v1/irrigation/predict'
+DEFAULT_URL = 'http://8.146.227.98:19099/api/v1/irrigation/predict'
 DEFAULT_API_KEY = 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
 DEFAULT_WEATHER_DIR = DEFAULT_DATA_DIR / 'weather_files'

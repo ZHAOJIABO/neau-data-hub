@@ -167,12 +167,8 @@ async function toggleTheme(event) {
     cursor: pointer;
     transition: background 0.3s;
     -webkit-tap-highlight-color: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
     margin-right: 12px;
-    border-radius: 9999px;
+    line-height: 40px;
 
     &:hover {
       background: var(--navbar-hover);

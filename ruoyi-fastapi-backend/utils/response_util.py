@@ -147,7 +147,7 @@ class ResponseUtil:
         result.update({'success': False, 'time': datetime.now()})
 
         return JSONResponse(
-            status_code=status.HTTP_200_OK,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             content=jsonable_encoder(result),
             headers=headers,
             media_type=media_type,
@@ -193,7 +193,7 @@ class ResponseUtil:
         result.update({'success': False, 'time': datetime.now()})
 
         return JSONResponse(
-            status_code=status.HTTP_200_OK,
+            status_code=status.HTTP_403_FORBIDDEN,
             content=jsonable_encoder(result),
             headers=headers,
             media_type=media_type,
@@ -239,7 +239,7 @@ class ResponseUtil:
         result.update({'success': False, 'time': datetime.now()})
 
         return JSONResponse(
-            status_code=status.HTTP_200_OK,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=jsonable_encoder(result),
             headers=headers,
             media_type=media_type,

@@ -28,8 +28,6 @@ DataHub 是一个面向农业科研场景的数据管理平台，用于集中管
 | AI 集成 | OpenAI、Anthropic、Google GenAI、Ollama 等多模型支持 |
 | 任务调度 | APScheduler |
 | 部署 | Docker Compose |
-| 测试 | Playwright (E2E) |
-| 代码检查 | Ruff |
 
 ## 项目结构
 

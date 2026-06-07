@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Annotated
 
 from fastapi import File, Form, UploadFile
@@ -15,6 +16,10 @@ irrigation_controller = APIRouterPro(
     tags=['灌溉决策'],
     dependencies=[irrigation_api_key_dependency()],
 )
+
+
+def _count_uploaded_files(files: Sequence[UploadFile] | None) -> int:
+    return len(files) if files is not None else 0
 
 
 @irrigation_controller.post(
@@ -39,12 +44,12 @@ async def predict_irrigation(
         'irrigation predict request parsed: start_date={}, weather_files={}, observed_sm={}, first_weather_names={}',
         start_date,
         len(uploaded_files['weather_files']),
-        len(observed_sm or []),
+        _count_uploaded_files(observed_sm),
         [name for name, _ in uploaded_files['weather_files'][:5]],
     )
     if not uploaded_files['weather_files']:
         raise ServiceException(message='未收到 weather_files 文件，请检查前端是否正确提交 multipart/form-data')
-    if observed_sm:
+    if observed_sm is not None:
         uploaded_files['observed_sm'] = [(f.filename, await f.read()) for f in observed_sm]
 
     zip_path, zip_filename = await IrrigationService.run_prediction(
