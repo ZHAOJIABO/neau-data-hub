@@ -16,9 +16,7 @@ DEFAULT_OBSERVED_SM_DIR = DEFAULT_DATA_DIR / 'observed_sm'
 def build_files(weather_dir: Path, observed_sm_dir: Path | None) -> list[tuple[str, tuple[str, Iterator[bytes], str]]]:
     files = []
 
-    weather_files = sorted(
-        [p for p in weather_dir.iterdir() if p.is_file() and p.suffix.lower() in {'.tif', '.tiff'}]
-    )
+    weather_files = sorted([p for p in weather_dir.iterdir() if p.is_file() and p.suffix.lower() in {'.tif', '.tiff'}])
     if not weather_files:
         raise ValueError(f'weather_dir 下未找到 tif 文件: {weather_dir}')
 
