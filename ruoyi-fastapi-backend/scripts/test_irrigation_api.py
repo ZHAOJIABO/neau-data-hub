@@ -1,10 +1,10 @@
 import argparse
 import json
 import mimetypes
+from collections.abc import Iterator
 from pathlib import Path
 
 import requests
-
 
 DEFAULT_URL = 'http://8.146.227.98/api/v1/irrigation/predict'
 DEFAULT_API_KEY = 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
@@ -13,7 +13,7 @@ DEFAULT_WEATHER_DIR = DEFAULT_DATA_DIR / 'weather_files'
 DEFAULT_OBSERVED_SM_DIR = DEFAULT_DATA_DIR / 'observed_sm'
 
 
-def build_files(weather_dir: Path, observed_sm_dir: Path | None):
+def build_files(weather_dir: Path, observed_sm_dir: Path | None) -> list[tuple[str, tuple[str, Iterator[bytes], str]]]:
     files = []
 
     weather_files = sorted(
@@ -45,7 +45,7 @@ def parse_filename(response: requests.Response) -> str:
     return 'irrigation_prediction.zip'
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description='测试灌溉决策接口并下载返回的 ZIP 文件')
     parser.add_argument('--api-key', default=DEFAULT_API_KEY, help='接口请求头 X-Irrigation-Api-Key')
     parser.add_argument('--weather-dir', default=str(DEFAULT_WEATHER_DIR), help='天气 TIF 文件目录')
