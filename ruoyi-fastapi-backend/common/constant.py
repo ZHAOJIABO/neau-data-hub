@@ -1,5 +1,3 @@
-
-
 class CommonConstant:
     """
     常用常量

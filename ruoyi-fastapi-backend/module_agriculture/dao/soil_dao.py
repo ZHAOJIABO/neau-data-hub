@@ -33,7 +33,9 @@ class SoilDao:
         query = (
             select(SoilSensorMonitor)
             .where(
-                SoilSensorMonitor.device_name.like(f'%{query_object.device_name}%') if query_object.device_name else True,
+                SoilSensorMonitor.device_name.like(f'%{query_object.device_name}%')
+                if query_object.device_name
+                else True,
                 SoilSensorMonitor.obs_time >= query_object.start_date if query_object.start_date else True,
                 SoilSensorMonitor.obs_time <= query_object.end_date if query_object.end_date else True,
             )

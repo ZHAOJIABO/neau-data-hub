@@ -226,9 +226,7 @@ class IrrigationService:
         weather_np_list = []
         for date_idx in range(len(weather_data)):
             day_data = weather_data[date_idx]
-            weather_np_list.append(
-                np.stack([day_data[var].flatten()[valid_idx] for var in cls.VAR_ORDER], axis=0)
-            )
+            weather_np_list.append(np.stack([day_data[var].flatten()[valid_idx] for var in cls.VAR_ORDER], axis=0))
 
         weather_tensor = torch.from_numpy(np.stack(weather_np_list, axis=0)).float()
         weather_tensor = torch.where(
@@ -592,7 +590,9 @@ class IrrigationService:
         """
         weather_files = uploaded_files.get('weather_files', [])
         if not weather_files:
-            raise ValueError('未上传气象数据文件，请通过 weather_files 一次性上传 15×7 个 TIF 文件；如果来自浏览器前端，请检查不要手动设置 Content-Type，让浏览器自动附带 multipart boundary')
+            raise ValueError(
+                '未上传气象数据文件，请通过 weather_files 一次性上传 15×7 个 TIF 文件；如果来自浏览器前端，请检查不要手动设置 Content-Type，让浏览器自动附带 multipart boundary'
+            )
 
         weather_data, profile, invalid_name_files = cls._parse_weather_files(weather_files, sim_start)
         cls._validate_weather_parse_result(weather_data, weather_files, invalid_name_files, sim_start)
@@ -719,7 +719,9 @@ class IrrigationService:
         expected_count = cls.ROLL_HORIZON * len(cls.VAR_ORDER)
         uploaded_weather_count = len(weather_files)
         if uploaded_weather_count < expected_count:
-            raise ValueError(f'气象数据文件数量不足，需要至少 {expected_count} 个文件，当前仅上传 {uploaded_weather_count} 个')
+            raise ValueError(
+                f'气象数据文件数量不足，需要至少 {expected_count} 个文件，当前仅上传 {uploaded_weather_count} 个'
+            )
 
     @classmethod
     def _fill_missing_days(
@@ -790,7 +792,9 @@ class IrrigationService:
                 if shape is None:
                     shape = arr.shape
                 elif arr.shape != shape:
-                    raise ValueError(f'栅格尺寸不匹配：变量 {var} 第 {day_idx} 天形状 {arr.shape} 与参考 {shape} 不一致')
+                    raise ValueError(
+                        f'栅格尺寸不匹配：变量 {var} 第 {day_idx} 天形状 {arr.shape} 与参考 {shape} 不一致'
+                    )
 
     @classmethod
     def _compute_valid_pixels(
@@ -898,9 +902,7 @@ class IrrigationService:
 
         norm = weight / weight.sum()
         new_val = low + (high - low) * (norm - norm.min()) / (norm.max() - norm.min() + cls.SCALE_EPSILON)
-        new_val = low + (high - low) * (new_val - new_val.min()) / (
-            new_val.max() - new_val.min() + cls.SCALE_EPSILON
-        )
+        new_val = low + (high - low) * (new_val - new_val.min()) / (new_val.max() - new_val.min() + cls.SCALE_EPSILON)
 
         irr_valid = irr_valid.clone()
         irr_valid[irrigated_mask] = new_val

@@ -31,9 +31,7 @@ class WeatherService:
         return await WeatherDao.get_temperature_list(query_db, query_object, is_page)
 
     @classmethod
-    async def add_temperature_services(
-        cls, query_db: AsyncSession, data: WeatherTemperatureModel
-    ) -> CrudResponseModel:
+    async def add_temperature_services(cls, query_db: AsyncSession, data: WeatherTemperatureModel) -> CrudResponseModel:
         try:
             await WeatherDao.add_temperature(query_db, data)
             await query_db.commit()
