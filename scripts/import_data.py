@@ -19,7 +19,18 @@ import sys
 import re
 from datetime import datetime
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ruoyi-fastapi-backend'))
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+BACKEND_IMPORT_CANDIDATES = [
+    os.environ.get('DATAHUB_BACKEND_DIR'),
+    os.path.abspath(os.path.join(SCRIPT_DIR, '..', 'ruoyi-fastapi-backend')),
+    # Docker compose mounts this script directory to /app/datahub_scripts while
+    # backend source lives at /app.
+    '/app',
+]
+for backend_dir in BACKEND_IMPORT_CANDIDATES:
+    if backend_dir and os.path.isdir(os.path.join(backend_dir, 'utils')):
+        sys.path.insert(0, backend_dir)
+        break
 
 try:
     import psycopg2
