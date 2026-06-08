@@ -185,7 +185,7 @@ def import_weather_csv(conn, filepath, table, columns, stcd_col='STCD', date_col
     return count
 
 
-def import_weather(conn, data_dir):
+def import_weather(conn, data_dir, skip_large=False):
     """导入所有气象数据"""
     print("\n===== 导入气象数据 =====")
     total = 0
@@ -241,14 +241,17 @@ def import_weather(conn, data_dir):
                                         [('Tmean', 'tmean'), ('precip', 'precip'), ('ET0', 'et0')])
 
     # 2000-2020 大文件（多站点数据，分块读入）
-    for filename, table, columns in [
-        ('2000-2020RHU.csv', 'weather_humidity', [('relative_humidity', 'rh_mean')]),
-        ('2000-2020湿度.csv', 'weather_precipitation', [('precipitation', 'precipitation')]),
-    ]:
-        f = os.path.join(data_dir, '气象数据/鹤北小流域', filename)
-        if os.path.isfile(f):
-            print(f"\n  [导入] {filename} (大文件，分块处理...)")
-            total += import_large_weather_csv(conn, f, table, columns)
+    if skip_large:
+        print("\n  [跳过] 大文件（--skip-large）")
+    else:
+        for filename, table, columns in [
+            ('2000-2020RHU.csv', 'weather_humidity', [('relative_humidity', 'rh_mean')]),
+            ('2000-2020湿度.csv', 'weather_precipitation', [('precipitation', 'precipitation')]),
+        ]:
+            f = os.path.join(data_dir, '气象数据/鹤北小流域', filename)
+            if os.path.isfile(f):
+                print(f"\n  [导入] {filename} (大文件，分块处理...)")
+                total += import_large_weather_csv(conn, f, table, columns)
 
     print(f"\n气象数据合计: {total} 条")
     return total
@@ -919,21 +922,14 @@ def main():
         print(f"数据库连接失败: {e}")
         sys.exit(1)
 
-    # 如果 skip-large，临时重命名大文件以跳过
-    skip_files = []
-    if args.skip_large:
-        for fname in ['2000-2020RHU.csv', '2000-2020湿度.csv']:
-            fpath = os.path.join(args.data_dir, '气象数据/鹤北小流域', fname)
-            if os.path.isfile(fpath):
-                skip_path = fpath + '.skip'
-                os.rename(fpath, skip_path)
-                skip_files.append((fpath, skip_path))
+    # 如果 skip-large，直接跳过大文件
+    skip_large = args.skip_large
 
     try:
         grand_total = 0
 
         if args.only is None or args.only == "weather":
-            grand_total += import_weather(conn, args.data_dir)
+            grand_total += import_weather(conn, args.data_dir, skip_large=skip_large)
 
         if args.only is None or args.only == "soil":
             grand_total += import_soil(conn, args.data_dir)
@@ -955,10 +951,6 @@ def main():
         conn.rollback()
         sys.exit(1)
     finally:
-        # 恢复被跳过的文件
-        for orig, skip in skip_files:
-            if os.path.isfile(skip):
-                os.rename(skip, orig)
         conn.close()
 
 
