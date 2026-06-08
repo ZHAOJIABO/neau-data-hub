@@ -71,6 +71,12 @@ def get_connection(args):
     return conn
 
 
+def is_user_data_file(filename):
+    """排除 macOS 资源文件、隐藏文件和 Office 临时文件。"""
+    base = os.path.basename(filename)
+    return not (base.startswith('.') or base.startswith('._') or base.startswith('~$'))
+
+
 def parse_numeric(val):
     """从带单位的字符串中提取数值，如 '-8.2℃' -> -8.2, '3.93%' -> 3.93"""
     if val is None:
@@ -384,12 +390,16 @@ def import_soil_sensor(conn, data_dir):
 
     # 查找传感器数据文件
     sensor_files = [f for f in os.listdir(soil_dir)
-                    if ('传感器' in f) and f.endswith('.xls')]
+                    if is_user_data_file(f) and ('传感器' in f) and f.endswith('.xls')]
 
     for filename in sorted(sensor_files):
         filepath = os.path.join(soil_dir, filename)
         print(f"  [导入] {filename}")
-        df = pd.read_excel(filepath)
+        try:
+            df = pd.read_excel(filepath)
+        except ValueError as exc:
+            print(f"    [跳过] 无法识别的 Excel 文件: {exc}")
+            continue
         cur = conn.cursor()
 
         sql = """
