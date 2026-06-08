@@ -160,3 +160,6 @@ data/
 
 .codegraph/
 cache
+pgdata/
+redisdata/
+datapre/

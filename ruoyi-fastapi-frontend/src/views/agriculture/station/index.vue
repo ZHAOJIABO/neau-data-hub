@@ -1,19 +1,34 @@
 <template>
-  <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
-      <el-form-item label="站点编码" prop="stcd">
-        <el-input v-model="queryParams.stcd" placeholder="请输入站点编码" clearable style="width: 200px" @keyup.enter="handleQuery" />
-      </el-form-item>
-      <el-form-item label="站点名称" prop="name">
-        <el-input v-model="queryParams.name" placeholder="请输入站点名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
+  <div class="app-container agri-page">
+    <section class="agri-page__hero">
+      <div>
+        <span class="agri-page__eyebrow">STATION ASSETS</span>
+        <h1 class="agri-page__title">监测站点</h1>
+        <p class="agri-page__desc">统一维护站点编码、空间位置、海拔与描述信息，为气象、土壤和作物数据提供空间索引。</p>
+      </div>
+      <div class="agri-page__tags">
+        <span>站点编码</span>
+        <span>经纬度</span>
+        <span>海拔</span>
+      </div>
+    </section>
 
-    <el-row :gutter="10" class="mb8">
+    <div class="agri-toolbar">
+      <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
+        <el-form-item label="站点编码" prop="stcd">
+          <el-input v-model="queryParams.stcd" placeholder="请输入站点编码" clearable style="width: 200px" @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item label="站点名称" prop="name">
+          <el-input v-model="queryParams.name" placeholder="请输入站点名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+          <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+
+    <el-row :gutter="10" class="mb8 agri-actions">
       <el-col :span="1.5">
         <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['agriculture:station:add']">新增</el-button>
       </el-col>
@@ -26,22 +41,24 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" prop="id" width="60" />
-      <el-table-column label="站点编码" prop="stcd" width="100" />
-      <el-table-column label="站点名称" prop="name" width="140" />
-      <el-table-column label="纬度" prop="latitude" width="100" />
-      <el-table-column label="经度" prop="longitude" width="100" />
-      <el-table-column label="海拔(m)" prop="altitude" width="100" />
-      <el-table-column label="描述" prop="description" />
-      <el-table-column label="操作" width="150" align="center">
-        <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['agriculture:station:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['agriculture:station:remove']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="agri-table-card">
+      <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column label="ID" prop="id" width="60" />
+        <el-table-column label="站点编码" prop="stcd" width="100" />
+        <el-table-column label="站点名称" prop="name" width="140" />
+        <el-table-column label="纬度" prop="latitude" width="100" />
+        <el-table-column label="经度" prop="longitude" width="100" />
+        <el-table-column label="海拔(m)" prop="altitude" width="100" />
+        <el-table-column label="描述" prop="description" />
+        <el-table-column label="操作" width="150" align="center">
+          <template #default="scope">
+            <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['agriculture:station:edit']">修改</el-button>
+            <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['agriculture:station:remove']">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
     <pagination
       v-show="total > 0"

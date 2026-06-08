@@ -3,7 +3,7 @@
     <template v-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.alwaysShow">
       <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild.path, onlyOneChild.query)">
         <el-menu-item :index="resolvePath(onlyOneChild.path)" :class="{ 'submenu-title-noDropdown': !isNest }">
-          <svg-icon :icon-class="onlyOneChild.meta.icon || (item.meta && item.meta.icon)"/>
+          <svg-icon :icon-class="getMenuIcon(onlyOneChild.meta.icon || (item.meta && item.meta.icon), onlyOneChild.meta.title)"/>
           <template #title><span class="menu-title" :title="hasTitle(onlyOneChild.meta.title)">{{ onlyOneChild.meta.title }}</span></template>
         </el-menu-item>
       </app-link>
@@ -11,7 +11,7 @@
 
     <el-sub-menu v-else ref="subMenu" :index="resolvePath(item.path)" teleported>
       <template v-if="item.meta" #title>
-        <svg-icon :icon-class="item.meta && item.meta.icon" />
+        <svg-icon :icon-class="getMenuIcon(item.meta && item.meta.icon, item.meta.title)" />
         <span class="menu-title" :title="hasTitle(item.meta.title)">{{ item.meta.title }}</span>
       </template>
 
@@ -31,6 +31,11 @@
 import { isExternal } from '@/utils/validate'
 import AppLink from './Link'
 import { getNormalPath } from '@/utils/ruoyi'
+
+const iconModules = import.meta.glob('../../../assets/icons/svg/*.svg')
+const availableIcons = new Set(
+  Object.keys(iconModules).map(path => path.split('/').pop().replace('.svg', ''))
+)
 
 const props = defineProps({
   // route object
@@ -96,5 +101,27 @@ function hasTitle(title){
   } else {
     return "";
   }
+}
+
+function getMenuIcon(icon, title) {
+  const fallbackIcons = {
+    '首页': 'dashboard',
+    '灌溉决策': 'dashboard',
+    '农业数据': 'chart',
+    '数据概览': 'dashboard',
+    '气象数据': 'dashboard',
+    '气象综合': 'list',
+    '温度数据': 'sunny',
+    '湿度数据': 'monitor',
+    '降水数据': 'download',
+    '土壤数据': 'tree-table',
+    '作物数据': 'documentation',
+    '叶面积指数': 'chart',
+    '站点管理': 'international'
+  }
+  if (icon && availableIcons.has(icon)) {
+    return icon
+  }
+  return fallbackIcons[title] || 'dashboard'
 }
 </script>

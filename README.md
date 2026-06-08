@@ -101,12 +101,24 @@ pip install -r requirements-pg.txt
 # 初始化数据库
 # 1. 创建数据库 ruoyi-fastapi
 # 2. 执行 sql/ruoyi-fastapi.sql（MySQL）或 sql/ruoyi-fastapi-pg.sql（PostgreSQL）
-# 3. 执行 scripts/datahub_database.sql（农业数据表）
+# 3. 执行 scripts/datahub_database.sql（农业数据表与数据资产索引表）
 # 4. 执行 scripts/menu_insert.sql（农业模块菜单）
 
 # 启动
 python app.py --env=dev
 ```
+
+### 农业数据导入
+
+```bash
+# 导入表格数据和非表格空间数据资产索引
+python3 scripts/import_data.py --data-dir ./data --host localhost --port 15432 --user postgres --password root --db ruoyi-fastapi
+
+# 只登记 GeoTIFF/Shapefile 等非表格空间数据资产
+python3 scripts/import_data.py --data-dir ./data --host localhost --port 15432 --user postgres --password root --db ruoyi-fastapi --only asset
+```
+
+非表格空间数据采用“原始文件保留在 `data/`，数据库登记 `data_asset` 元数据索引”的方式。GeoTIFF 会登记坐标系、范围、分辨率、变量名和日期；Shapefile 会登记主文件及配套组件。若后续需要将 Shapefile 几何写入数据库，需要把 PostgreSQL 环境升级为 PostGIS 后再扩展几何入库流程。
 
 ### 前端
 

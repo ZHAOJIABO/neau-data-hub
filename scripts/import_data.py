@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
 import_data.py — 农业数据导入脚本 (PostgreSQL)
-将 data/ 目录下的表格文件(CSV/XLS/XLSX)导入 PostgreSQL datahub 数据库
+将 data/ 目录下的表格文件(CSV/XLS/XLSX)和空间文件资产索引导入 PostgreSQL datahub 数据库
 
 用法:
     python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub
     python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only weather
     python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only soil
     python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only crop
+    python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only asset
 """
 
 import argparse
+import json
+import math
 import os
 import sys
 import re
@@ -18,7 +21,7 @@ from datetime import datetime
 
 try:
     import psycopg2
-    from psycopg2.extras import execute_values
+    from psycopg2.extras import Json, execute_values
 except ImportError:
     print("错误: 需要安装 psycopg2")
     print("  pip install psycopg2-binary")
@@ -43,6 +46,10 @@ def get_connection(args):
         "port": args.port,
         "user": args.user,
         "dbname": args.db,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
     }
     if args.password:
         kwargs["password"] = args.password
@@ -100,6 +107,30 @@ def parse_date_flexible(val):
         return None
 
 
+def normalize_rel_path(path):
+    """统一数据库中保存的相对路径格式，避免不同系统路径分隔符造成重复。"""
+    return path.replace(os.sep, '/')
+
+
+def clean_float(val):
+    """将 numpy/栅格库返回的数值转换为可安全入库的 Python float。"""
+    if val is None:
+        return None
+    try:
+        fval = float(val)
+    except (TypeError, ValueError):
+        return None
+    return fval if math.isfinite(fval) else None
+
+
+def first_matching_part(parts, names):
+    """从路径片段中找到第一个匹配值。"""
+    for part in parts:
+        if part in names:
+            return part
+    return None
+
+
 # ============================================================
 # 气象数据导入
 # ============================================================
@@ -126,7 +157,10 @@ def import_weather_csv(conn, filepath, table, columns, stcd_col='STCD', date_col
     batch = []
     count = 0
     for _, row in df.iterrows():
-        stcd = str(int(row[stcd_col]))
+        raw_stcd = row[stcd_col]
+        if pd.isna(raw_stcd):
+            continue
+        stcd = str(int(raw_stcd))
         obs_date = parse_date_flexible(row[date_col])
         if obs_date is None:
             continue
@@ -136,14 +170,14 @@ def import_weather_csv(conn, filepath, table, columns, stcd_col='STCD', date_col
         batch.append(tuple(values))
         count += 1
 
-        if len(batch) >= 5000:
+        if len(batch) >= 500:
             cur.executemany(sql, batch)
+            conn.commit()
             batch = []
 
     if batch:
         cur.executemany(sql, batch)
-
-    conn.commit()
+        conn.commit()
     cur.close()
     print(f"    {count} 条记录")
     return count
@@ -701,6 +735,278 @@ def import_crop(conn, data_dir):
 
 
 # ============================================================
+# 非表格空间/文件资产索引
+# ============================================================
+
+RASTER_EXTS = {'.tif', '.tiff'}
+VECTOR_EXTS = {'.shp'}
+SHAPEFILE_SIDECARE_EXTS = {
+    '.shp', '.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx', '.xml',
+}
+
+
+def classify_asset_path(data_dir, filepath):
+    """根据 data/ 目录结构和文件名推断数据资产语义。"""
+    rel_path = normalize_rel_path(os.path.relpath(filepath, data_dir))
+    parts = rel_path.split('/')
+    filename = os.path.basename(filepath)
+    stem, ext = os.path.splitext(filename)
+    lower_ext = ext.lower()
+
+    data_category = parts[0] if parts else None
+    region_name = first_matching_part(parts, {'鹤北小流域', '浓江农场'})
+    asset_type = 'raster' if lower_ext in RASTER_EXTS else 'vector' if lower_ext in VECTOR_EXTS else 'file'
+    asset_name = stem
+    variable_name = None
+    obs_date = None
+
+    weather_raster = re.match(r'^([A-Za-z][A-Za-z0-9]*|radiationNet)_(\d{4}-\d{2}-\d{2})$', stem)
+    if weather_raster:
+        variable_name = weather_raster.group(1)
+        obs_date = parse_date_flexible(weather_raster.group(2))
+        asset_name = os.path.basename(os.path.dirname(filepath))
+    elif 'dem' in stem.lower():
+        variable_name = 'DEM'
+        asset_name = f'{region_name or ""}DEM'.strip()
+    elif 'TDLY' in stem or '土地利用' in rel_path:
+        variable_name = '土地利用'
+        asset_name = '鹤北流域土地利用'
+    elif '种植' in stem or '水稻' in stem:
+        variable_name = '种植结构'
+        asset_name = '浓江农场水稻种植分布'
+    elif lower_ext in VECTOR_EXTS:
+        variable_name = os.path.basename(os.path.dirname(filepath))
+
+    return {
+        'asset_type': asset_type,
+        'data_category': data_category,
+        'region_name': region_name,
+        'asset_name': asset_name,
+        'variable_name': variable_name,
+        'obs_date': obs_date,
+        'file_format': lower_ext.lstrip('.'),
+        'relative_path': rel_path,
+        'size_bytes': os.path.getsize(filepath),
+    }
+
+
+def read_raster_metadata(filepath):
+    """读取 GeoTIFF 元数据；没有 rasterio 时降级为空元数据。"""
+    metadata = {
+        'crs': None,
+        'bbox': None,
+        'raster_width': None,
+        'raster_height': None,
+        'raster_count': None,
+        'raster_dtype': None,
+        'resolution_x': None,
+        'resolution_y': None,
+        'nodata_value': None,
+        'extra_metadata': {},
+    }
+    try:
+        import rasterio
+    except ImportError:
+        metadata['extra_metadata']['metadata_warning'] = 'rasterio 未安装，未读取栅格空间元数据'
+        return metadata
+
+    try:
+        with rasterio.open(filepath) as src:
+            bounds = src.bounds
+            metadata.update({
+                'crs': src.crs.to_string() if src.crs else None,
+                'bbox': {
+                    'minx': clean_float(bounds.left),
+                    'miny': clean_float(bounds.bottom),
+                    'maxx': clean_float(bounds.right),
+                    'maxy': clean_float(bounds.top),
+                },
+                'raster_width': src.width,
+                'raster_height': src.height,
+                'raster_count': src.count,
+                'raster_dtype': src.dtypes[0] if src.dtypes else None,
+                'resolution_x': clean_float(abs(src.res[0])) if src.res else None,
+                'resolution_y': clean_float(abs(src.res[1])) if src.res else None,
+                'nodata_value': clean_float(src.nodata),
+                'extra_metadata': {
+                    'driver': src.driver,
+                    'transform': [clean_float(v) for v in list(src.transform)[:6]],
+                },
+            })
+    except Exception as e:
+        metadata['extra_metadata']['metadata_error'] = str(e)
+    return metadata
+
+
+def read_vector_metadata(filepath):
+    """读取 Shapefile 元数据；没有 fiona 时至少登记组件文件。"""
+    base, _ = os.path.splitext(filepath)
+    dir_name = os.path.dirname(filepath)
+    prefix = os.path.basename(base)
+    components = []
+    for name in sorted(os.listdir(dir_name)):
+        candidate = os.path.join(dir_name, name)
+        candidate_base, candidate_ext = os.path.splitext(candidate)
+        is_direct_component = candidate_base == base and candidate_ext.lower() in SHAPEFILE_SIDECARE_EXTS
+        is_metadata_component = name == f'{prefix}.shp.xml'
+        if is_direct_component or is_metadata_component:
+            components.append(name)
+
+    metadata = {
+        'crs': None,
+        'bbox': None,
+        'raster_width': None,
+        'raster_height': None,
+        'raster_count': None,
+        'raster_dtype': None,
+        'resolution_x': None,
+        'resolution_y': None,
+        'nodata_value': None,
+        'extra_metadata': {
+            'components': components,
+            'component_count': len(components),
+            'shapefile_stem': prefix,
+        },
+    }
+
+    try:
+        import fiona
+    except ImportError:
+        metadata['extra_metadata']['metadata_warning'] = 'fiona 未安装，未读取矢量空间元数据'
+        return metadata
+
+    try:
+        with fiona.open(filepath) as src:
+            bounds = src.bounds
+            crs_text = src.crs_wkt
+            if not crs_text and src.crs:
+                crs_text = json.dumps(dict(src.crs), ensure_ascii=False)
+            metadata.update({
+                'crs': crs_text,
+                'bbox': {
+                    'minx': clean_float(bounds[0]),
+                    'miny': clean_float(bounds[1]),
+                    'maxx': clean_float(bounds[2]),
+                    'maxy': clean_float(bounds[3]),
+                },
+            })
+            metadata['extra_metadata'].update({
+                'driver': src.driver,
+                'feature_count': len(src),
+                'schema': src.schema,
+            })
+    except Exception as e:
+        metadata['extra_metadata']['metadata_error'] = str(e)
+
+    return metadata
+
+
+def build_asset_record(data_dir, filepath):
+    """构造 data_asset upsert 记录。"""
+    record = classify_asset_path(data_dir, filepath)
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext in RASTER_EXTS:
+        record.update(read_raster_metadata(filepath))
+    elif ext in VECTOR_EXTS:
+        record.update(read_vector_metadata(filepath))
+    return record
+
+
+def upsert_data_assets(conn, records):
+    """批量写入数据资产索引。"""
+    if not records:
+        return 0
+
+    sql = """
+        INSERT INTO data_asset (
+            asset_type, data_category, region_name, asset_name, variable_name,
+            obs_date, file_format, relative_path, size_bytes, crs, bbox,
+            raster_width, raster_height, raster_count, raster_dtype,
+            resolution_x, resolution_y, nodata_value, extra_metadata, updated_at
+        )
+        VALUES (
+            %(asset_type)s, %(data_category)s, %(region_name)s, %(asset_name)s, %(variable_name)s,
+            %(obs_date)s, %(file_format)s, %(relative_path)s, %(size_bytes)s, %(crs)s, %(bbox)s,
+            %(raster_width)s, %(raster_height)s, %(raster_count)s, %(raster_dtype)s,
+            %(resolution_x)s, %(resolution_y)s, %(nodata_value)s, %(extra_metadata)s, NOW()
+        )
+        ON CONFLICT (relative_path) DO UPDATE SET
+            asset_type = EXCLUDED.asset_type,
+            data_category = EXCLUDED.data_category,
+            region_name = EXCLUDED.region_name,
+            asset_name = EXCLUDED.asset_name,
+            variable_name = EXCLUDED.variable_name,
+            obs_date = EXCLUDED.obs_date,
+            file_format = EXCLUDED.file_format,
+            size_bytes = EXCLUDED.size_bytes,
+            crs = EXCLUDED.crs,
+            bbox = EXCLUDED.bbox,
+            raster_width = EXCLUDED.raster_width,
+            raster_height = EXCLUDED.raster_height,
+            raster_count = EXCLUDED.raster_count,
+            raster_dtype = EXCLUDED.raster_dtype,
+            resolution_x = EXCLUDED.resolution_x,
+            resolution_y = EXCLUDED.resolution_y,
+            nodata_value = EXCLUDED.nodata_value,
+            extra_metadata = EXCLUDED.extra_metadata,
+            updated_at = NOW()
+    """
+
+    cur = conn.cursor()
+    db_records = []
+    for record in records:
+        row = record.copy()
+        row['bbox'] = Json(row.get('bbox')) if row.get('bbox') is not None else None
+        row['extra_metadata'] = Json(row.get('extra_metadata') or {})
+        db_records.append(row)
+    cur.executemany(sql, db_records)
+    conn.commit()
+    cur.close()
+    return len(records)
+
+
+def import_data_assets(conn, data_dir):
+    """扫描并登记非表格空间数据资产。"""
+    print("\n===== 导入非表格空间数据资产索引 =====")
+
+    asset_files = []
+    for root, _, filenames in os.walk(data_dir):
+        for filename in filenames:
+            if filename.startswith('~$') or filename == '.DS_Store':
+                continue
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in RASTER_EXTS or ext in VECTOR_EXTS:
+                asset_files.append(os.path.join(root, filename))
+
+    asset_files.sort()
+    total = 0
+    batch = []
+    raster_count = 0
+    vector_count = 0
+
+    for filepath in asset_files:
+        record = build_asset_record(data_dir, filepath)
+        if record['asset_type'] == 'raster':
+            raster_count += 1
+        elif record['asset_type'] == 'vector':
+            vector_count += 1
+        batch.append(record)
+
+        if len(batch) >= 500:
+            total += upsert_data_assets(conn, batch)
+            print(f"  已登记 {total} 个资产...", end='\r')
+            batch = []
+
+    if batch:
+        total += upsert_data_assets(conn, batch)
+
+    print(f"  栅格资产: {raster_count} 个")
+    print(f"  矢量资产: {vector_count} 个")
+    print(f"\n空间数据资产合计: {total} 个")
+    return total
+
+
+# ============================================================
 # 主函数
 # ============================================================
 
@@ -713,9 +1019,12 @@ def main():
   data/
   ├── 气象数据/
   │   ├── 鹤北小流域/   (humidity_daily.csv, temperature_daily.csv, ...)
-  │   └── 浓江农场/     (humidity_daily.csv, ET0_daily_result.csv, ...)
+  │   └── 浓江农场/     (humidity_daily.csv, ET0_daily_result.csv, RAIN_2024-*.tif, ...)
   ├── 土壤数据/
   │   └── 鹤北小流域/   (土壤参数k.xls, 传感器监测数据...xls, ...)
+  ├── 自然地理数据/
+  │   ├── 鹤北小流域/   (DEM、土地利用、边界/等高线 Shapefile ...)
+  │   └── 浓江农场/     (DEM、种植结构 GeoTIFF ...)
   └── 作物数据/
       └── 鹤北小流域/   (叶面积.xlsx)
 
@@ -723,6 +1032,7 @@ def main():
   python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub
   python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only weather
   python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --password mypass --only soil
+  python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only asset
         """,
     )
     parser.add_argument("--data-dir", required=True,
@@ -737,7 +1047,7 @@ def main():
                         help="PostgreSQL 密码")
     parser.add_argument("--db", default="datahub",
                         help="数据库名 (默认: datahub)")
-    parser.add_argument("--only", choices=["weather", "soil", "crop"],
+    parser.add_argument("--only", choices=["weather", "soil", "crop", "asset"],
                         default=None, help="只导入指定类别")
     parser.add_argument("--skip-large", action="store_true",
                         help="跳过大文件(2000-2020RHU.csv等，约1800万行)")
@@ -788,6 +1098,9 @@ def main():
 
         if args.only is None or args.only == "crop":
             grand_total += import_crop(conn, args.data_dir)
+
+        if args.only is None or args.only == "asset":
+            grand_total += import_data_assets(conn, args.data_dir)
 
         print("\n" + "=" * 60)
         print(f"  导入完成！总计: {grand_total} 条记录")

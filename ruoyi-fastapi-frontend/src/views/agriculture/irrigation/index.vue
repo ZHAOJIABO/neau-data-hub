@@ -1,5 +1,20 @@
 <template>
-  <div class="app-container irrigation-page">
+  <div class="app-container agri-page irrigation-page">
+    <section class="agri-page__hero">
+      <div>
+        <span class="agri-page__eyebrow">IRRIGATION DECISION MODEL</span>
+        <h1 class="agri-page__title">灌溉决策预测</h1>
+        <p class="agri-page__desc">
+          上传气象栅格文件并调用灌溉决策接口，生成灌溉量与土壤含水量时序结果，支持地图叠加、日期切换和播放。
+        </p>
+      </div>
+      <div class="agri-page__tags">
+        <span>模型推演</span>
+        <span>栅格结果</span>
+        <span>地图播放</span>
+      </div>
+    </section>
+
     <el-row :gutter="20" class="page-layout">
       <el-col :xs="24" :lg="9">
         <el-card shadow="hover" class="main-card">
@@ -653,7 +668,7 @@ onUnmounted(() => {
 
 <style scoped>
 .irrigation-page {
-  padding-bottom: 24px;
+  padding-bottom: 28px;
 }
 
 .page-layout {
@@ -662,7 +677,10 @@ onUnmounted(() => {
 
 .main-card,
 .map-card {
-  border-radius: 16px;
+  border-radius: 24px;
+  border: 1px solid var(--hairline-color);
+  box-shadow: var(--content-shadow-soft);
+  overflow: hidden;
 }
 
 .result-map-card {
@@ -678,13 +696,13 @@ onUnmounted(() => {
 
 .card-title {
   font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
+  font-weight: 650;
+  color: var(--text-primary);
 }
 
 .card-desc {
   margin-top: 6px;
-  color: var(--el-text-color-secondary);
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
@@ -699,10 +717,10 @@ onUnmounted(() => {
 }
 
 .upload-item {
-  padding: 16px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 12px;
-  background: var(--el-fill-color-blank);
+  padding: 18px;
+  border: 1px solid var(--hairline-color);
+  border-radius: 18px;
+  background: var(--surface-soft-bg);
 }
 
 .upload-title {
@@ -711,13 +729,14 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
-  font-weight: 500;
+  color: var(--text-primary);
+  font-weight: 650;
 }
 
 .upload-hint {
   margin-top: 10px;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .file-summary {
@@ -752,10 +771,10 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 12px;
-  border-radius: 8px;
-  background: var(--el-fill-color-light);
+  border-radius: 14px;
+  background: var(--surface-soft-bg);
   font-size: 14px;
-  color: var(--el-text-color-secondary);
+  color: var(--text-secondary);
 }
 
 .parse-status.error {
@@ -777,9 +796,9 @@ onUnmounted(() => {
 
 .legend-section {
   padding: 12px;
-  border-radius: 8px;
-  background: var(--el-fill-color-blank);
-  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--surface-bg);
+  border: 1px solid var(--hairline-soft-color);
 }
 
 .legend-title {
@@ -824,7 +843,7 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 12px;
+  border-radius: 18px;
   overflow: hidden;
 }
 
@@ -839,7 +858,7 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 14px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
   backdrop-filter: blur(6px);
@@ -867,9 +886,9 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  border-radius: 8px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  background: var(--surface-soft-bg);
+  border: 1px solid var(--hairline-soft-color);
 }
 
 .playback-header {
@@ -979,7 +998,7 @@ onUnmounted(() => {
 .map-placeholder-card {
   max-width: 360px;
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
   backdrop-filter: blur(8px);
