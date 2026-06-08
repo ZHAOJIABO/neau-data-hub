@@ -215,6 +215,19 @@ class CachePathConfig:
     PATHSTR = 'caches'
 
 
+class DataAssetConfig:
+    """
+    数据资产上传配置
+    """
+
+    UPLOAD_ROOT = os.path.join(os.path.abspath(os.getcwd()), 'data_assets')
+    DATA_DIR = os.path.join(os.path.abspath(os.getcwd()), 'data')
+
+    def __init__(self) -> None:
+        if not os.path.exists(self.UPLOAD_ROOT):
+            os.makedirs(self.UPLOAD_ROOT)
+
+
 class IrrigationApiKeySettings(BaseSettings):
     """
     灌溉决策接口配置
@@ -342,5 +355,7 @@ TransportCryptoConfig = get_config.get_transport_crypto_config()
 GenConfig = get_config.get_gen_config()
 # 上传配置
 UploadConfig = get_config.get_upload_config()
+# 数据资产配置
+DataAssetSettings = DataAssetConfig()
 # 灌溉接口配置
 IrrigationConfig = IrrigationApiKeySettings()

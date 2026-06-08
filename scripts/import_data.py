@@ -19,6 +19,8 @@ import sys
 import re
 from datetime import datetime
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ruoyi-fastapi-backend'))
+
 try:
     import psycopg2
     from psycopg2.extras import Json, execute_values
@@ -744,172 +746,12 @@ SHAPEFILE_SIDECARE_EXTS = {
     '.shp', '.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx', '.xml',
 }
 
-
-def classify_asset_path(data_dir, filepath):
-    """根据 data/ 目录结构和文件名推断数据资产语义。"""
-    rel_path = normalize_rel_path(os.path.relpath(filepath, data_dir))
-    parts = rel_path.split('/')
-    filename = os.path.basename(filepath)
-    stem, ext = os.path.splitext(filename)
-    lower_ext = ext.lower()
-
-    data_category = parts[0] if parts else None
-    region_name = first_matching_part(parts, {'鹤北小流域', '浓江农场'})
-    asset_type = 'raster' if lower_ext in RASTER_EXTS else 'vector' if lower_ext in VECTOR_EXTS else 'file'
-    asset_name = stem
-    variable_name = None
-    obs_date = None
-
-    weather_raster = re.match(r'^([A-Za-z][A-Za-z0-9]*|radiationNet)_(\d{4}-\d{2}-\d{2})$', stem)
-    if weather_raster:
-        variable_name = weather_raster.group(1)
-        obs_date = parse_date_flexible(weather_raster.group(2))
-        asset_name = os.path.basename(os.path.dirname(filepath))
-    elif 'dem' in stem.lower():
-        variable_name = 'DEM'
-        asset_name = f'{region_name or ""}DEM'.strip()
-    elif 'TDLY' in stem or '土地利用' in rel_path:
-        variable_name = '土地利用'
-        asset_name = '鹤北流域土地利用'
-    elif '种植' in stem or '水稻' in stem:
-        variable_name = '种植结构'
-        asset_name = '浓江农场水稻种植分布'
-    elif lower_ext in VECTOR_EXTS:
-        variable_name = os.path.basename(os.path.dirname(filepath))
-
-    return {
-        'asset_type': asset_type,
-        'data_category': data_category,
-        'region_name': region_name,
-        'asset_name': asset_name,
-        'variable_name': variable_name,
-        'obs_date': obs_date,
-        'file_format': lower_ext.lstrip('.'),
-        'relative_path': rel_path,
-        'size_bytes': os.path.getsize(filepath),
-    }
-
-
-def read_raster_metadata(filepath):
-    """读取 GeoTIFF 元数据；没有 rasterio 时降级为空元数据。"""
-    metadata = {
-        'crs': None,
-        'bbox': None,
-        'raster_width': None,
-        'raster_height': None,
-        'raster_count': None,
-        'raster_dtype': None,
-        'resolution_x': None,
-        'resolution_y': None,
-        'nodata_value': None,
-        'extra_metadata': {},
-    }
-    try:
-        import rasterio
-    except ImportError:
-        metadata['extra_metadata']['metadata_warning'] = 'rasterio 未安装，未读取栅格空间元数据'
-        return metadata
-
-    try:
-        with rasterio.open(filepath) as src:
-            bounds = src.bounds
-            metadata.update({
-                'crs': src.crs.to_string() if src.crs else None,
-                'bbox': {
-                    'minx': clean_float(bounds.left),
-                    'miny': clean_float(bounds.bottom),
-                    'maxx': clean_float(bounds.right),
-                    'maxy': clean_float(bounds.top),
-                },
-                'raster_width': src.width,
-                'raster_height': src.height,
-                'raster_count': src.count,
-                'raster_dtype': src.dtypes[0] if src.dtypes else None,
-                'resolution_x': clean_float(abs(src.res[0])) if src.res else None,
-                'resolution_y': clean_float(abs(src.res[1])) if src.res else None,
-                'nodata_value': clean_float(src.nodata),
-                'extra_metadata': {
-                    'driver': src.driver,
-                    'transform': [clean_float(v) for v in list(src.transform)[:6]],
-                },
-            })
-    except Exception as e:
-        metadata['extra_metadata']['metadata_error'] = str(e)
-    return metadata
-
-
-def read_vector_metadata(filepath):
-    """读取 Shapefile 元数据；没有 fiona 时至少登记组件文件。"""
-    base, _ = os.path.splitext(filepath)
-    dir_name = os.path.dirname(filepath)
-    prefix = os.path.basename(base)
-    components = []
-    for name in sorted(os.listdir(dir_name)):
-        candidate = os.path.join(dir_name, name)
-        candidate_base, candidate_ext = os.path.splitext(candidate)
-        is_direct_component = candidate_base == base and candidate_ext.lower() in SHAPEFILE_SIDECARE_EXTS
-        is_metadata_component = name == f'{prefix}.shp.xml'
-        if is_direct_component or is_metadata_component:
-            components.append(name)
-
-    metadata = {
-        'crs': None,
-        'bbox': None,
-        'raster_width': None,
-        'raster_height': None,
-        'raster_count': None,
-        'raster_dtype': None,
-        'resolution_x': None,
-        'resolution_y': None,
-        'nodata_value': None,
-        'extra_metadata': {
-            'components': components,
-            'component_count': len(components),
-            'shapefile_stem': prefix,
-        },
-    }
-
-    try:
-        import fiona
-    except ImportError:
-        metadata['extra_metadata']['metadata_warning'] = 'fiona 未安装，未读取矢量空间元数据'
-        return metadata
-
-    try:
-        with fiona.open(filepath) as src:
-            bounds = src.bounds
-            crs_text = src.crs_wkt
-            if not crs_text and src.crs:
-                crs_text = json.dumps(dict(src.crs), ensure_ascii=False)
-            metadata.update({
-                'crs': crs_text,
-                'bbox': {
-                    'minx': clean_float(bounds[0]),
-                    'miny': clean_float(bounds[1]),
-                    'maxx': clean_float(bounds[2]),
-                    'maxy': clean_float(bounds[3]),
-                },
-            })
-            metadata['extra_metadata'].update({
-                'driver': src.driver,
-                'feature_count': len(src),
-                'schema': src.schema,
-            })
-    except Exception as e:
-        metadata['extra_metadata']['metadata_error'] = str(e)
-
-    return metadata
-
-
-def build_asset_record(data_dir, filepath):
-    """构造 data_asset upsert 记录。"""
-    record = classify_asset_path(data_dir, filepath)
-    ext = os.path.splitext(filepath)[1].lower()
-    if ext in RASTER_EXTS:
-        record.update(read_raster_metadata(filepath))
-    elif ext in VECTOR_EXTS:
-        record.update(read_vector_metadata(filepath))
-    return record
+from utils.data_asset_util import (
+    classify_asset_path,
+    read_raster_metadata,
+    read_vector_metadata,
+    build_asset_record,
+)
 
 
 def upsert_data_assets(conn, records):

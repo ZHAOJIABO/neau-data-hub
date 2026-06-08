@@ -62,6 +62,7 @@ datahub/
 - **地温数据** — 多层地温监测（10-200cm）
 - **黑土厚度** — 黑土层厚度监测
 - **监测站管理** — 气象站/监测点信息维护
+- **数据资产** — GeoTIFF/Shapefile 等非表格空间文件的上传、下载、元数据管理
 - **数据看板** — 农业数据可视化仪表盘
 
 ### 系统管理
@@ -118,7 +119,9 @@ python3 scripts/import_data.py --data-dir ./data --host localhost --port 15432 -
 python3 scripts/import_data.py --data-dir ./data --host localhost --port 15432 --user postgres --password root --db ruoyi-fastapi --only asset
 ```
 
-非表格空间数据采用“原始文件保留在 `data/`，数据库登记 `data_asset` 元数据索引”的方式。GeoTIFF 会登记坐标系、范围、分辨率、变量名和日期；Shapefile 会登记主文件及配套组件。若后续需要将 Shapefile 几何写入数据库，需要把 PostgreSQL 环境升级为 PostGIS 后再扩展几何入库流程。
+非表格空间数据采用”原始文件保留在 `data/`，数据库登记 `data_asset` 元数据索引”的方式。GeoTIFF 会登记坐标系、范围、分辨率、变量名和日期；Shapefile 会登记主文件及配套组件。若后续需要将 Shapefile 几何写入数据库，需要把 PostgreSQL 环境升级为 PostGIS 后再扩展几何入库流程。
+
+用户也可通过 Web 界面的「数据资产」页面直接上传 `.tif`/`.tiff` 或 Shapefile `.zip` 文件，上传的文件存储在 `data_assets/` 目录下，与导入脚本索引的 `data/` 目录互不影响。详见 [数据资产管理文档](ruoyi-fastapi-backend/docs/data_asset_management.md)。
 
 ### 前端
 

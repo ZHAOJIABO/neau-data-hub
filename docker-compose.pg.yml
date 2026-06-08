@@ -28,6 +28,7 @@ services:
       - ./ruoyi-fastapi-backend/models:/app/models
       - ./scripts:/app/datahub_scripts:ro
       - ${NEAU_DATA_DIR:-/root/workspace/neau-data-hub/data}:/app/data:ro
+      - ./data_assets:/app/data_assets
     depends_on:
       ruoyi-pg:
         condition: service_healthy

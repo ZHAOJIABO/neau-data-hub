@@ -263,28 +263,34 @@ COMMENT ON TABLE soil_monitor_log IS '土壤水分地温监测试验清单';
 
 -- 5.4 数据资产索引（GeoTIFF/Shapefile 等非表格文件先登记元数据，原始文件保留在文件系统）
 CREATE TABLE IF NOT EXISTS data_asset (
-    id              BIGSERIAL PRIMARY KEY,
-    asset_type      VARCHAR(20)   NOT NULL,      -- raster / vector / file
-    data_category   VARCHAR(50)   DEFAULT NULL,  -- 气象数据 / 自然地理数据 / 土壤数据 / 作物数据
-    region_name     VARCHAR(50)   DEFAULT NULL,  -- 鹤北小流域 / 浓江农场
-    asset_name      VARCHAR(200)  NOT NULL,      -- 数据名称
-    variable_name   VARCHAR(50)   DEFAULT NULL,  -- RAIN / WIND / DEM / 土地利用等
-    obs_date        DATE          DEFAULT NULL,  -- 逐日栅格日期
-    file_format     VARCHAR(20)   NOT NULL,      -- tif / shp 等
-    relative_path   TEXT          NOT NULL UNIQUE,
-    size_bytes      BIGINT        DEFAULT NULL,
-    crs             TEXT          DEFAULT NULL,
-    bbox            JSONB         DEFAULT NULL,  -- {"minx":..,"miny":..,"maxx":..,"maxy":..}
-    raster_width    INTEGER       DEFAULT NULL,
-    raster_height   INTEGER       DEFAULT NULL,
-    raster_count    INTEGER       DEFAULT NULL,
-    raster_dtype    VARCHAR(50)   DEFAULT NULL,
-    resolution_x    DOUBLE PRECISION DEFAULT NULL,
-    resolution_y    DOUBLE PRECISION DEFAULT NULL,
-    nodata_value    DOUBLE PRECISION DEFAULT NULL,
-    extra_metadata  JSONB         DEFAULT NULL,  -- Shapefile 组件、读取错误、驱动等扩展信息
-    created_at      TIMESTAMP     NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMP     NOT NULL DEFAULT NOW()
+    id                BIGSERIAL PRIMARY KEY,
+    asset_type        VARCHAR(20)   NOT NULL,      -- raster / vector / file
+    data_category     VARCHAR(50)   DEFAULT NULL,  -- 气象数据 / 自然地理数据 / 土壤数据 / 作物数据
+    region_name       VARCHAR(50)   DEFAULT NULL,  -- 鹤北小流域 / 浓江农场
+    asset_name        VARCHAR(200)  NOT NULL,      -- 数据名称
+    variable_name     VARCHAR(50)   DEFAULT NULL,  -- RAIN / WIND / DEM / 土地利用等
+    obs_date          DATE          DEFAULT NULL,  -- 逐日栅格日期
+    file_format       VARCHAR(20)   NOT NULL,      -- tif / shp 等
+    relative_path     TEXT          NOT NULL UNIQUE,
+    original_filename VARCHAR(255)  DEFAULT NULL,  -- 用户上传时的原始文件名
+    storage_path      TEXT          DEFAULT NULL,  -- 受管上传根下的实际存储路径
+    size_bytes        BIGINT        DEFAULT NULL,
+    checksum          VARCHAR(64)   DEFAULT NULL,  -- SHA-256 文件校验和
+    source_type       VARCHAR(20)   NOT NULL DEFAULT 'import', -- import / upload
+    upload_user_id    BIGINT        DEFAULT NULL,  -- 上传用户ID
+    crs               TEXT          DEFAULT NULL,
+    bbox              JSONB         DEFAULT NULL,  -- {"minx":..,"miny":..,"maxx":..,"maxy":..}
+    raster_width      INTEGER       DEFAULT NULL,
+    raster_height     INTEGER       DEFAULT NULL,
+    raster_count      INTEGER       DEFAULT NULL,
+    raster_dtype      VARCHAR(50)   DEFAULT NULL,
+    resolution_x      DOUBLE PRECISION DEFAULT NULL,
+    resolution_y      DOUBLE PRECISION DEFAULT NULL,
+    nodata_value      DOUBLE PRECISION DEFAULT NULL,
+    extra_metadata    JSONB         DEFAULT NULL,  -- Shapefile 组件、读取错误、驱动等扩展信息
+    created_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
+    deleted_at        TIMESTAMP     DEFAULT NULL   -- 软删除时间戳
 );
 
 COMMENT ON TABLE data_asset IS '非表格空间/文件数据资产索引';
@@ -312,6 +318,9 @@ CREATE INDEX idx_data_asset_category ON data_asset (data_category);
 CREATE INDEX idx_data_asset_region   ON data_asset (region_name);
 CREATE INDEX idx_data_asset_variable ON data_asset (variable_name);
 CREATE INDEX idx_data_asset_date     ON data_asset (obs_date);
+CREATE INDEX idx_data_asset_source   ON data_asset (source_type);
+CREATE INDEX idx_data_asset_deleted  ON data_asset (deleted_at);
+CREATE INDEX idx_data_asset_checksum ON data_asset (checksum);
 
 -- ============================================================
 -- 七、视图
