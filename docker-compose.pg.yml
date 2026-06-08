@@ -26,6 +26,8 @@ services:
       - "19099:9099"
     volumes:
       - ./ruoyi-fastapi-backend/models:/app/models
+      - ./scripts:/app/datahub_scripts:ro
+      - ${NEAU_DATA_DIR:-/root/workspace/neau-data-hub/data}:/app/data:ro
     depends_on:
       ruoyi-pg:
         condition: service_healthy
@@ -78,4 +80,3 @@ networks:
   ruoyi-network:
     name: ruoyi-network
     driver: bridge
-

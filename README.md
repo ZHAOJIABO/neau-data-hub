@@ -151,14 +151,52 @@ pnpm dev:mp-weixin
 
 ## Docker 部署
 
-> **注意：** 默认未做数据持久化配置，请自行配置数据卷或做好备份。
+> **注意：** PostgreSQL 版本会使用 `pgdata/`、`redisdata/` 做本地持久化；农业 TIF/Shapefile 等大文件不进入 Git，通过 `NEAU_DATA_DIR` 挂载到后端容器的 `/app/data`。
 
 ```bash
 # MySQL 版本
 docker compose -f docker-compose.my.yml up -d --build
 
 # PostgreSQL 版本
+cp .env.example .env
+# 按服务器实际数据目录调整 NEAU_DATA_DIR，例如：
+# NEAU_DATA_DIR=/root/workspace/neau-data-hub/data
 docker compose -f docker-compose.pg.yml up -d --build
+```
+
+### PostgreSQL 版重新初始化与数据导入
+
+如果当前 Docker 数据库没有需要保留的数据，可以删除旧容器和 `pgdata/` 后重新初始化，启动时会自动执行 `ruoyi-fastapi-pg.sql`、`scripts/datahub_database.sql` 和 `scripts/menu_insert.sql`：
+
+```bash
+docker compose -f docker-compose.pg.yml down
+rm -rf pgdata redisdata
+docker compose -f docker-compose.pg.yml up -d --build
+```
+
+容器启动后，可在后端容器内导入表格数据并登记 TIF/Shapefile 资产索引：
+
+```bash
+docker exec -it ruoyi-backend-pg python /app/datahub_scripts/import_data.py \
+  --data-dir /app/data \
+  --host ruoyi-pg \
+  --port 5432 \
+  --user postgres \
+  --password root \
+  --db ruoyi-fastapi
+```
+
+如果只需要登记 TIF/Shapefile 等非表格空间资产：
+
+```bash
+docker exec -it ruoyi-backend-pg python /app/datahub_scripts/import_data.py \
+  --data-dir /app/data \
+  --host ruoyi-pg \
+  --port 5432 \
+  --user postgres \
+  --password root \
+  --db ruoyi-fastapi \
+  --only asset
 ```
 
 ## 生产构建
