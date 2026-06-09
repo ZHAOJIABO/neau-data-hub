@@ -114,9 +114,21 @@
 }
 
 .agri-table-card .el-table {
+  width: 100%;
   border: 0;
   border-radius: 18px;
   box-shadow: none;
+}
+
+.agri-table-card .el-table__inner-wrapper,
+.agri-table-card .el-table__header-wrapper,
+.agri-table-card .el-table__body-wrapper {
+  width: 100% !important;
+}
+
+.agri-table-card .el-table__header,
+.agri-table-card .el-table__body {
+  min-width: 100% !important;
 }
 
 .agri-table-card .el-table th.el-table__cell {

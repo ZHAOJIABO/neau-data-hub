@@ -37,13 +37,13 @@
 
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList">
-        <el-table-column label="ID" prop="id" width="80" />
-        <el-table-column label="设备名称" prop="deviceName" width="140" />
-        <el-table-column label="深度(cm)" prop="depthCm" width="100" />
-        <el-table-column label="温度(℃)" prop="temperature" width="100" />
-        <el-table-column label="湿度(%)" prop="humidity" width="100" />
-        <el-table-column label="电导率(μs/cm)" prop="conductivity" width="130" />
-        <el-table-column label="上报时间" prop="obsTime" width="180" />
+        <el-table-column label="ID" prop="id" min-width="80" />
+        <el-table-column label="设备名称" prop="deviceName" min-width="140" />
+        <el-table-column label="深度(cm)" prop="depthCm" min-width="100" />
+        <el-table-column label="温度(℃)" prop="temperature" min-width="100" />
+        <el-table-column label="湿度(%)" prop="humidity" min-width="100" />
+        <el-table-column label="电导率(μs/cm)" prop="conductivity" min-width="130" />
+        <el-table-column label="上报时间" prop="obsTime" min-width="180" />
       </el-table>
     </div>
 

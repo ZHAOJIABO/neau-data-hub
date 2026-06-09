@@ -44,13 +44,13 @@
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="ID" prop="id" width="60" />
-        <el-table-column label="站点编码" prop="stcd" width="100" />
-        <el-table-column label="站点名称" prop="name" width="140" />
-        <el-table-column label="纬度" prop="latitude" width="100" />
-        <el-table-column label="经度" prop="longitude" width="100" />
-        <el-table-column label="海拔(m)" prop="altitude" width="100" />
-        <el-table-column label="描述" prop="description" />
+        <el-table-column label="ID" prop="id" min-width="60" />
+        <el-table-column label="站点编码" prop="stcd" min-width="100" />
+        <el-table-column label="站点名称" prop="name" min-width="140" />
+        <el-table-column label="纬度" prop="latitude" min-width="100" />
+        <el-table-column label="经度" prop="longitude" min-width="100" />
+        <el-table-column label="海拔(m)" prop="altitude" min-width="100" />
+        <el-table-column label="描述" prop="description" min-width="160" />
         <el-table-column label="操作" width="150" align="center">
           <template #default="scope">
             <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['agriculture:station:edit']">修改</el-button>

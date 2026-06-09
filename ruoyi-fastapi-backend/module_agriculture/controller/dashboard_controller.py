@@ -26,6 +26,6 @@ async def get_dashboard_stats(
     request: Request,
     query_db: Annotated[AsyncSession, DBSessionDependency()],
 ) -> Response:
-    result = await DashboardService.get_stats_services(query_db)
+    result = await DashboardService.get_stats_services(query_db, request.app.state.redis)
     logger.info('获取数据概览统计成功')
     return ResponseUtil.success(data=result)

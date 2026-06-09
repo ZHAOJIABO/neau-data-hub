@@ -19,12 +19,12 @@
 
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList">
-        <el-table-column label="ID" prop="id" width="80" />
-        <el-table-column label="监测点编号" prop="pointId" width="120" />
-        <el-table-column label="经度" prop="pointX" width="130" />
-        <el-table-column label="纬度" prop="pointY" width="130" />
-        <el-table-column label="黑土厚度(cm)" prop="blackSoilDepthCm" width="130" />
-        <el-table-column label="创建时间" prop="createdAt" width="180" />
+        <el-table-column label="ID" prop="id" min-width="80" />
+        <el-table-column label="监测点编号" prop="pointId" min-width="120" />
+        <el-table-column label="经度" prop="pointX" min-width="130" />
+        <el-table-column label="纬度" prop="pointY" min-width="130" />
+        <el-table-column label="黑土厚度(cm)" prop="blackSoilDepthCm" min-width="130" />
+        <el-table-column label="创建时间" prop="createdAt" min-width="180" />
       </el-table>
     </div>
 

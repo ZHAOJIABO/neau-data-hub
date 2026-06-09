@@ -41,13 +41,13 @@
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="ID" prop="id" width="80" />
-        <el-table-column label="站点编码" prop="stcd" width="100" />
-        <el-table-column label="日期" prop="obsDate" width="120" />
-        <el-table-column label="最高温(℃)" prop="tmax" width="110" />
-        <el-table-column label="最低温(℃)" prop="tmin" width="110" />
-        <el-table-column label="平均温(℃)" prop="tmean" width="110" />
-        <el-table-column label="创建时间" prop="createdAt" width="180" />
+        <el-table-column label="ID" prop="id" min-width="80" />
+        <el-table-column label="站点编码" prop="stcd" min-width="100" />
+        <el-table-column label="日期" prop="obsDate" min-width="120" />
+        <el-table-column label="最高温(℃)" prop="tmax" min-width="110" />
+        <el-table-column label="最低温(℃)" prop="tmin" min-width="110" />
+        <el-table-column label="平均温(℃)" prop="tmean" min-width="110" />
+        <el-table-column label="创建时间" prop="createdAt" min-width="180" />
       </el-table>
     </div>
 

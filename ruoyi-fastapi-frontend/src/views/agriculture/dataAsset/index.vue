@@ -75,25 +75,25 @@
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="ID" prop="id" width="60" />
+        <el-table-column label="ID" prop="id" min-width="60" />
         <el-table-column label="文件名称" prop="assetName" min-width="160" show-overflow-tooltip />
         <el-table-column label="相对路径" prop="relativePath" min-width="260" show-overflow-tooltip />
-        <el-table-column label="类型" prop="assetType" width="80" align="center">
+        <el-table-column label="类型" prop="assetType" min-width="80" align="center">
           <template #default="scope">
             <el-tag :type="scope.row.assetType === 'raster' ? 'success' : scope.row.assetType === 'vector' ? 'warning' : 'info'" size="small">
               {{ scope.row.assetType }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="格式" prop="fileFormat" width="70" align="center" />
-        <el-table-column label="分类" prop="dataCategory" width="120" />
-        <el-table-column label="区域" prop="regionName" width="110" />
-        <el-table-column label="大小" prop="sizeBytes" width="100" align="right">
+        <el-table-column label="格式" prop="fileFormat" min-width="70" align="center" />
+        <el-table-column label="分类" prop="dataCategory" min-width="120" />
+        <el-table-column label="区域" prop="regionName" min-width="110" />
+        <el-table-column label="大小" prop="sizeBytes" min-width="100" align="right">
           <template #default="scope">
             {{ formatSize(scope.row.sizeBytes) }}
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" prop="createdAt" width="160" />
+        <el-table-column label="创建时间" prop="createdAt" min-width="160" />
         <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="scope">
             <el-button link type="primary" icon="Download" @click="handleDownload(scope.row)" v-hasPermi="['agriculture:dataAsset:download']">下载</el-button>

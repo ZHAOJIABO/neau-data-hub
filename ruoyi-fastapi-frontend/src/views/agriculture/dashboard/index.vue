@@ -86,12 +86,23 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { getDashboardStats } from '@/api/agriculture/dashboard'
+import cache from '@/plugins/cache'
 
 const stats = ref({})
+const statsCacheKey = 'agricultureDashboardStats'
 
 function getStats() {
+  const cachedStats = cache.local.getJSON(statsCacheKey)
+  if (cachedStats) {
+    stats.value = cachedStats.data || {}
+  }
+
   getDashboardStats().then(response => {
-    stats.value = response.data
+    stats.value = response.data || {}
+    cache.local.setJSON(statsCacheKey, {
+      data: stats.value,
+      time: Date.now()
+    })
   })
 }
 

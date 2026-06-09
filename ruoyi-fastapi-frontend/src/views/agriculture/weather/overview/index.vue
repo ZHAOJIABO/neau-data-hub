@@ -37,16 +37,16 @@
 
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList">
-        <el-table-column label="站点名称" prop="stationName" width="120" />
-        <el-table-column label="站点编码" prop="stcd" width="100" />
-        <el-table-column label="日期" prop="obsDate" width="120" />
-        <el-table-column label="最高温(℃)" prop="tmax" width="100" />
-        <el-table-column label="最低温(℃)" prop="tmin" width="100" />
-        <el-table-column label="平均温(℃)" prop="tmean" width="100" />
-        <el-table-column label="湿度(%)" prop="rhMean" width="90" />
-        <el-table-column label="降水(mm)" prop="precipitation" width="100" />
-        <el-table-column label="日照(h)" prop="sunshineHours" width="90" />
-        <el-table-column label="风速(m/s)" prop="windSpeed" width="100" />
+        <el-table-column label="站点名称" prop="stationName" min-width="120" />
+        <el-table-column label="站点编码" prop="stcd" min-width="100" />
+        <el-table-column label="日期" prop="obsDate" min-width="120" />
+        <el-table-column label="最高温(℃)" prop="tmax" min-width="100" />
+        <el-table-column label="最低温(℃)" prop="tmin" min-width="100" />
+        <el-table-column label="平均温(℃)" prop="tmean" min-width="100" />
+        <el-table-column label="湿度(%)" prop="rhMean" min-width="90" />
+        <el-table-column label="降水(mm)" prop="precipitation" min-width="100" />
+        <el-table-column label="日照(h)" prop="sunshineHours" min-width="90" />
+        <el-table-column label="风速(m/s)" prop="windSpeed" min-width="100" />
       </el-table>
     </div>
 

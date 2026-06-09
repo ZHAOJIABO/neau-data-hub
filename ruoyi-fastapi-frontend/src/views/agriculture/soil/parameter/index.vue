@@ -35,17 +35,17 @@
 
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList">
-        <el-table-column label="ID" prop="id" width="70" />
-        <el-table-column label="来源" prop="source" width="70" />
-        <el-table-column label="网格ID" prop="gridId" width="80" />
-        <el-table-column label="有机碳" prop="oc05" width="90" />
-        <el-table-column label="砂粒" prop="sand05" width="90" />
-        <el-table-column label="粘粒" prop="clay05" width="90" />
-        <el-table-column label="粉粒" prop="silt05" width="90" />
-        <el-table-column label="容重" prop="bulkDensity" width="90" />
-        <el-table-column label="K值" prop="kValue" width="100" />
-        <el-table-column label="含水量" prop="moistureContent" width="90" />
-        <el-table-column label="田间持水量" prop="fieldCapacity" width="110" />
+        <el-table-column label="ID" prop="id" min-width="70" />
+        <el-table-column label="来源" prop="source" min-width="70" />
+        <el-table-column label="网格ID" prop="gridId" min-width="80" />
+        <el-table-column label="有机碳" prop="oc05" min-width="90" />
+        <el-table-column label="砂粒" prop="sand05" min-width="90" />
+        <el-table-column label="粘粒" prop="clay05" min-width="90" />
+        <el-table-column label="粉粒" prop="silt05" min-width="90" />
+        <el-table-column label="容重" prop="bulkDensity" min-width="90" />
+        <el-table-column label="K值" prop="kValue" min-width="100" />
+        <el-table-column label="含水量" prop="moistureContent" min-width="90" />
+        <el-table-column label="田间持水量" prop="fieldCapacity" min-width="110" />
       </el-table>
     </div>
 

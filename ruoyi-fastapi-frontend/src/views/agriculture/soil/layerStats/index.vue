@@ -19,13 +19,13 @@
 
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList">
-        <el-table-column label="ID" prop="id" width="80" />
-        <el-table-column label="土层深度" prop="layerDepth" width="120" />
-        <el-table-column label="最大值" prop="maxValue" width="110" />
-        <el-table-column label="最小值" prop="minValue" width="110" />
-        <el-table-column label="均值" prop="meanValue" width="110" />
-        <el-table-column label="标准偏差" prop="stdDev" width="110" />
-        <el-table-column label="变异系数" prop="cv" width="110" />
+        <el-table-column label="ID" prop="id" min-width="80" />
+        <el-table-column label="土层深度" prop="layerDepth" min-width="120" />
+        <el-table-column label="最大值" prop="maxValue" min-width="110" />
+        <el-table-column label="最小值" prop="minValue" min-width="110" />
+        <el-table-column label="均值" prop="meanValue" min-width="110" />
+        <el-table-column label="标准偏差" prop="stdDev" min-width="110" />
+        <el-table-column label="变异系数" prop="cv" min-width="110" />
       </el-table>
     </div>
 

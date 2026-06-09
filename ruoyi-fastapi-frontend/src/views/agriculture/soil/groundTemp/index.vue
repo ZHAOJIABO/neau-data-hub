@@ -34,11 +34,11 @@
 
     <div class="agri-table-card">
       <el-table v-loading="loading" :data="dataList">
-        <el-table-column label="ID" prop="id" width="80" />
-        <el-table-column label="日期" prop="obsDate" width="120" />
-        <el-table-column label="深度(cm)" prop="depthCm" width="100" />
-        <el-table-column label="地温(℃)" prop="temperature" width="100" />
-        <el-table-column label="创建时间" prop="createdAt" width="180" />
+        <el-table-column label="ID" prop="id" min-width="80" />
+        <el-table-column label="日期" prop="obsDate" min-width="120" />
+        <el-table-column label="深度(cm)" prop="depthCm" min-width="100" />
+        <el-table-column label="地温(℃)" prop="temperature" min-width="100" />
+        <el-table-column label="创建时间" prop="createdAt" min-width="180" />
       </el-table>
     </div>
 
