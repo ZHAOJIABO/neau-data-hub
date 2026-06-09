@@ -416,9 +416,9 @@ def import_soil_sensor(conn, data_dir):
             depth = parse_depth_cm(row.get('序号'))
             if depth is None:
                 continue
-            temp = parse_numeric(row.get('温度'))
-            humidity = parse_numeric(row.get('湿度'))
-            conductivity = parse_numeric(row.get('电导率'))
+            temp = parse_numeric(row.get('温度') or row.get('土壤温度'))
+            humidity = parse_numeric(row.get('湿度') or row.get('土壤湿度'))
+            conductivity = parse_numeric(row.get('电导率') or row.get('土壤电导率'))
             obs_time = row.get('上报时间')
             if obs_time is None or (isinstance(obs_time, float) and pd.isna(obs_time)):
                 continue
