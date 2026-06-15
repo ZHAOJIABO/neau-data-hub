@@ -62,6 +62,7 @@ datahub/
 - **地温数据** — 多层地温监测（10-200cm）
 - **黑土厚度** — 黑土层厚度监测
 - **监测站管理** — 气象站/监测点信息维护
+- **数据资产** — GeoTIFF/Shapefile 等非表格空间文件的上传、下载、元数据管理
 - **数据看板** — 农业数据可视化仪表盘
 
 ### 系统管理
@@ -101,12 +102,26 @@ pip install -r requirements-pg.txt
 # 初始化数据库
 # 1. 创建数据库 ruoyi-fastapi
 # 2. 执行 sql/ruoyi-fastapi.sql（MySQL）或 sql/ruoyi-fastapi-pg.sql（PostgreSQL）
-# 3. 执行 scripts/datahub_database.sql（农业数据表）
+# 3. 执行 scripts/datahub_database.sql（农业数据表与数据资产索引表）
 # 4. 执行 scripts/menu_insert.sql（农业模块菜单）
 
 # 启动
 python app.py --env=dev
 ```
+
+### 农业数据导入
+
+```bash
+# 导入表格数据和非表格空间数据资产索引
+python3 scripts/import_data.py --data-dir ./data --host localhost --port 15432 --user postgres --password root --db ruoyi-fastapi
+
+# 只登记 GeoTIFF/Shapefile 等非表格空间数据资产
+python3 scripts/import_data.py --data-dir ./data --host localhost --port 15432 --user postgres --password root --db ruoyi-fastapi --only asset
+```
+
+非表格空间数据采用”原始文件保留在 `data/`，数据库登记 `data_asset` 元数据索引”的方式。GeoTIFF 会登记坐标系、范围、分辨率、变量名和日期；Shapefile 会登记主文件及配套组件。若后续需要将 Shapefile 几何写入数据库，需要把 PostgreSQL 环境升级为 PostGIS 后再扩展几何入库流程。
+
+用户也可通过 Web 界面的「数据资产」页面直接上传 `.tif`/`.tiff` 或 Shapefile `.zip` 文件，上传的文件存储在 `data_assets/` 目录下，与导入脚本索引的 `data/` 目录互不影响。详见 [数据资产管理文档](ruoyi-fastapi-backend/docs/data_asset_management.md)。
 
 ### 前端
 
@@ -139,14 +154,52 @@ pnpm dev:mp-weixin
 
 ## Docker 部署
 
-> **注意：** 默认未做数据持久化配置，请自行配置数据卷或做好备份。
+> **注意：** PostgreSQL 版本会使用 `pgdata/`、`redisdata/` 做本地持久化；农业 TIF/Shapefile 等大文件不进入 Git，通过 `NEAU_DATA_DIR` 挂载到后端容器的 `/app/data`。
 
 ```bash
 # MySQL 版本
 docker compose -f docker-compose.my.yml up -d --build
 
 # PostgreSQL 版本
+cp .env.example .env
+# 按服务器实际数据目录调整 NEAU_DATA_DIR，例如：
+# NEAU_DATA_DIR=/root/workspace/neau-data-hub/data
 docker compose -f docker-compose.pg.yml up -d --build
+```
+
+### PostgreSQL 版重新初始化与数据导入
+
+如果当前 Docker 数据库没有需要保留的数据，可以删除旧容器和 `pgdata/` 后重新初始化，启动时会自动执行 `ruoyi-fastapi-pg.sql`、`scripts/datahub_database.sql` 和 `scripts/menu_insert.sql`：
+
+```bash
+docker compose -f docker-compose.pg.yml down
+rm -rf pgdata redisdata
+docker compose -f docker-compose.pg.yml up -d --build
+```
+
+容器启动后，可在后端容器内导入表格数据并登记 TIF/Shapefile 资产索引：
+
+```bash
+docker exec -it ruoyi-backend-pg python /app/datahub_scripts/import_data.py \
+  --data-dir /app/data \
+  --host ruoyi-pg \
+  --port 5432 \
+  --user postgres \
+  --password root \
+  --db ruoyi-fastapi
+```
+
+如果只需要登记 TIF/Shapefile 等非表格空间资产：
+
+```bash
+docker exec -it ruoyi-backend-pg python /app/datahub_scripts/import_data.py \
+  --data-dir /app/data \
+  --host ruoyi-pg \
+  --port 5432 \
+  --user postgres \
+  --password root \
+  --db ruoyi-fastapi \
+  --only asset
 ```
 
 ## 生产构建

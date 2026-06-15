@@ -162,3 +162,6 @@ data/
 cache
 
 AGENTS.md
+pgdata/
+redisdata/
+datapre/

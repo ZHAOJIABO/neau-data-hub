@@ -1,29 +1,46 @@
 <template>
-  <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
-      <el-form-item label="小区编号" prop="plot">
-        <el-input v-model="queryParams.plot" placeholder="请输入小区编号" clearable style="width: 200px" @keyup.enter="handleQuery" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
+  <div class="app-container agri-page">
+    <section class="agri-page__hero">
+      <div>
+        <span class="agri-page__eyebrow">CROP SURVEY DATA</span>
+        <h1 class="agri-page__title">叶面积数据</h1>
+        <p class="agri-page__desc">查看小区、观测日期、植株序号、密度与叶面积调查记录。</p>
+      </div>
+      <div class="agri-page__tags">
+        <span>小区</span>
+        <span>植株</span>
+        <span>叶面积</span>
+      </div>
+    </section>
 
-    <el-row :gutter="10" class="mb8">
+    <div class="agri-toolbar">
+      <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
+        <el-form-item label="小区编号" prop="plot">
+          <el-input v-model="queryParams.plot" placeholder="请输入小区编号" clearable style="width: 200px" @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+          <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+
+    <el-row :gutter="10" class="mb8 agri-actions">
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="dataList">
-      <el-table-column label="ID" prop="id" width="80" />
-      <el-table-column label="小区编号" prop="plot" width="120" />
-      <el-table-column label="观测日期" prop="obsDate" width="100" />
-      <el-table-column label="植株序号" prop="plantNo" width="100" />
-      <el-table-column label="密度(株)" prop="density" width="100" />
-      <el-table-column label="叶面积1" prop="leafArea1" width="110" />
-      <el-table-column label="叶面积2" prop="leafArea2" width="110" />
-      <el-table-column label="叶面积3" prop="leafArea3" width="110" />
-    </el-table>
+    <div class="agri-table-card">
+      <el-table v-loading="loading" :data="dataList">
+        <el-table-column label="ID" prop="id" min-width="80" />
+        <el-table-column label="小区编号" prop="plot" min-width="120" />
+        <el-table-column label="观测日期" prop="obsDate" min-width="100" />
+        <el-table-column label="植株序号" prop="plantNo" min-width="100" />
+        <el-table-column label="密度(株)" prop="density" min-width="100" />
+        <el-table-column label="叶面积1" prop="leafArea1" min-width="110" />
+        <el-table-column label="叶面积2" prop="leafArea2" min-width="110" />
+        <el-table-column label="叶面积3" prop="leafArea3" min-width="110" />
+      </el-table>
+    </div>
 
     <pagination
       v-show="total > 0"

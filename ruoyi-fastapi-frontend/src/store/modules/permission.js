@@ -4,6 +4,7 @@ import { getRouters } from '@/api/menu'
 import Layout from '@/layout/index'
 import ParentView from '@/components/ParentView'
 import InnerLink from '@/layout/components/InnerLink'
+import { filterHiddenDisplayRoutes } from '@/utils/hiddenMenus'
 
 // 匹配views里面所有的.vue文件
 const modules = import.meta.glob('./../../views/**/*.vue')
@@ -42,12 +43,14 @@ const usePermissionStore = defineStore(
             const sidebarRoutes = filterAsyncRouter(sdata)
             const rewriteRoutes = filterAsyncRouter(rdata, false, true)
             const defaultRoutes = filterAsyncRouter(defaultData)
+            const visibleSidebarRoutes = filterHiddenDisplayRoutes(sidebarRoutes)
+            const visibleDefaultRoutes = filterHiddenDisplayRoutes(defaultRoutes)
             const asyncRoutes = filterDynamicRoutes(dynamicRoutes)
             asyncRoutes.forEach(route => { router.addRoute(route) })
             this.setRoutes(rewriteRoutes)
-            this.setSidebarRouters(constantRoutes.concat(sidebarRoutes))
-            this.setDefaultRoutes(sidebarRoutes)
-            this.setTopbarRoutes(defaultRoutes)
+            this.setSidebarRouters(constantRoutes.concat(visibleSidebarRoutes))
+            this.setDefaultRoutes(visibleSidebarRoutes)
+            this.setTopbarRoutes(visibleDefaultRoutes)
             resolve(rewriteRoutes)
           })
         })

@@ -52,6 +52,9 @@ insert into sys_menu values(2031, '叶面积指数', 2030, '1', 'leafArea', 'agr
 -- 二级菜单：站点管理
 insert into sys_menu values(2040, '站点管理', 2000, '5', 'station', 'agriculture/station/index', '', '', 1, 0, 'C', '0', '0', 'agriculture:station:list', 'international', 'admin', current_timestamp, '', null, '监测站点管理');
 
+-- 二级菜单：数据资产
+insert into sys_menu values(2045, '数据资产', 2000, '6', 'dataAsset', 'agriculture/dataAsset/index', '', '', 1, 0, 'C', '0', '0', 'agriculture:dataAsset:list', 'document', 'admin', current_timestamp, '', null, '数据资产管理');
+
 -- ============================================================
 -- 按钮权限（温度数据为例，其他类似）
 -- ============================================================
@@ -66,3 +69,9 @@ insert into sys_menu values(2061, '站点查询', 2040, '1', '', '', '', '', 1, 
 insert into sys_menu values(2062, '站点新增', 2040, '2', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:station:add', '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(2063, '站点修改', 2040, '3', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:station:edit', '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(2064, '站点删除', 2040, '4', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:station:remove', '#', 'admin', current_timestamp, '', null, '');
+
+-- 数据资产按钮
+insert into sys_menu values(2071, '资产查询', 2045, '1', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:dataAsset:query', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2072, '资产上传', 2045, '2', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:dataAsset:upload', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2073, '资产下载', 2045, '3', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:dataAsset:download', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2074, '资产删除', 2045, '4', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:dataAsset:remove', '#', 'admin', current_timestamp, '', null, '');

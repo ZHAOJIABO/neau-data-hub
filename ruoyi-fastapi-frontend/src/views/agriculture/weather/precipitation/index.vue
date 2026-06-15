@@ -1,32 +1,49 @@
 <template>
-  <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
-      <el-form-item label="站点编码" prop="stcd">
-        <el-input v-model="queryParams.stcd" placeholder="请输入站点编码" clearable style="width: 200px" @keyup.enter="handleQuery" />
-      </el-form-item>
-      <el-form-item label="开始日期" prop="startDate">
-        <el-date-picker v-model="queryParams.startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" style="width: 200px" />
-      </el-form-item>
-      <el-form-item label="结束日期" prop="endDate">
-        <el-date-picker v-model="queryParams.endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 200px" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
+  <div class="app-container agri-page">
+    <section class="agri-page__hero">
+      <div>
+        <span class="agri-page__eyebrow">PRECIPITATION DATA</span>
+        <h1 class="agri-page__title">降水数据</h1>
+        <p class="agri-page__desc">按站点和日期范围查看降水量记录，为作物需水和灌溉分析提供基础输入。</p>
+      </div>
+      <div class="agri-page__tags">
+        <span>站点</span>
+        <span>日期</span>
+        <span>降水量</span>
+      </div>
+    </section>
 
-    <el-row :gutter="10" class="mb8">
+    <div class="agri-toolbar">
+      <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
+        <el-form-item label="站点编码" prop="stcd">
+          <el-input v-model="queryParams.stcd" placeholder="请输入站点编码" clearable style="width: 200px" @keyup.enter="handleQuery" />
+        </el-form-item>
+        <el-form-item label="开始日期" prop="startDate">
+          <el-date-picker v-model="queryParams.startDate" type="date" placeholder="开始日期" value-format="YYYY-MM-DD" style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="结束日期" prop="endDate">
+          <el-date-picker v-model="queryParams.endDate" type="date" placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 200px" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+          <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+
+    <el-row :gutter="10" class="mb8 agri-actions">
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="dataList">
-      <el-table-column label="ID" prop="id" width="80" />
-      <el-table-column label="站点编码" prop="stcd" width="100" />
-      <el-table-column label="日期" prop="obsDate" width="120" />
-      <el-table-column label="降水量(mm)" prop="precipitation" width="120" />
-      <el-table-column label="创建时间" prop="createdAt" width="180" />
-    </el-table>
+    <div class="agri-table-card">
+      <el-table v-loading="loading" :data="dataList">
+        <el-table-column label="ID" prop="id" min-width="80" />
+        <el-table-column label="站点编码" prop="stcd" min-width="100" />
+        <el-table-column label="日期" prop="obsDate" min-width="120" />
+        <el-table-column label="降水量(mm)" prop="precipitation" min-width="120" />
+        <el-table-column label="创建时间" prop="createdAt" min-width="180" />
+      </el-table>
+    </div>
 
     <pagination
       v-show="total > 0"

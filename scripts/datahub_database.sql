@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS weather_humidity (
     id          BIGSERIAL PRIMARY KEY,
     stcd        VARCHAR(10)   NOT NULL,
     obs_date    DATE          NOT NULL,
-    rh_mean     DECIMAL(6,2)  DEFAULT NULL,      -- 日平均相对湿度(%)
+    rh_mean     DECIMAL(12,4) DEFAULT NULL,      -- 日平均相对湿度(%)
     created_at  TIMESTAMP     NOT NULL DEFAULT NOW(),
     UNIQUE (stcd, obs_date)
 );
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS weather_precipitation (
     id              BIGSERIAL PRIMARY KEY,
     stcd            VARCHAR(10)   NOT NULL,
     obs_date        DATE          NOT NULL,
-    precipitation   DECIMAL(8,2)  DEFAULT NULL,  -- 日降水量(mm)
+    precipitation   DECIMAL(12,4) DEFAULT NULL,  -- 日降水量(mm)
     created_at      TIMESTAMP     NOT NULL DEFAULT NOW(),
     UNIQUE (stcd, obs_date)
 );
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS weather_sunshine (
     id              BIGSERIAL PRIMARY KEY,
     stcd            VARCHAR(10)   NOT NULL,
     obs_date        DATE          NOT NULL,
-    sunshine_hours  DECIMAL(6,2)  DEFAULT NULL,  -- 日照时数(h)
+    sunshine_hours  DECIMAL(12,4) DEFAULT NULL,  -- 日照时数(h)
     created_at      TIMESTAMP     NOT NULL DEFAULT NOW(),
     UNIQUE (stcd, obs_date)
 );
@@ -78,9 +78,9 @@ CREATE TABLE IF NOT EXISTS weather_temperature (
     id          BIGSERIAL PRIMARY KEY,
     stcd        VARCHAR(10)   NOT NULL,
     obs_date    DATE          NOT NULL,
-    tmax        DECIMAL(6,2)  DEFAULT NULL,      -- 日最高温度(℃)
-    tmin        DECIMAL(6,2)  DEFAULT NULL,      -- 日最低温度(℃)
-    tmean       DECIMAL(6,2)  DEFAULT NULL,      -- 日平均温度(℃)
+    tmax        DECIMAL(12,4) DEFAULT NULL,      -- 日最高温度(℃)
+    tmin        DECIMAL(12,4) DEFAULT NULL,      -- 日最低温度(℃)
+    tmean       DECIMAL(12,4) DEFAULT NULL,      -- 日平均温度(℃)
     created_at  TIMESTAMP     NOT NULL DEFAULT NOW(),
     UNIQUE (stcd, obs_date)
 );
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS weather_wind (
     id          BIGSERIAL PRIMARY KEY,
     stcd        VARCHAR(10)   NOT NULL,
     obs_date    DATE          NOT NULL,
-    wind_speed  DECIMAL(6,2)  DEFAULT NULL,      -- 日平均风速(m/s)
+    wind_speed  DECIMAL(12,4) DEFAULT NULL,      -- 日平均风速(m/s)
     created_at  TIMESTAMP     NOT NULL DEFAULT NOW(),
     UNIQUE (stcd, obs_date)
 );
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS weather_et0 (
     obs_date    DATE          NOT NULL,
     tmean       DECIMAL(6,2)  DEFAULT NULL,      -- 日平均温度(℃)
     precip      DECIMAL(8,2)  DEFAULT NULL,      -- 日降水量(mm)
-    et0         DECIMAL(8,6)  DEFAULT NULL,      -- 参考蒸散量ET0(mm/d)
+    et0         DECIMAL(10,6) DEFAULT NULL,      -- 参考蒸散量ET0(mm/d)
     created_at  TIMESTAMP     NOT NULL DEFAULT NOW(),
     UNIQUE (stcd, obs_date)
 );
@@ -129,17 +129,17 @@ CREATE TABLE IF NOT EXISTS soil_parameter (
     sand_0_5                        DECIMAL(12,4) DEFAULT NULL,  -- 砂粒
     clay_0_5                        DECIMAL(12,4) DEFAULT NULL,  -- 粘粒
     silt_0_5                        DECIMAL(12,4) DEFAULT NULL,  -- 粉粒
-    bulk_density                    DECIMAL(8,4)  DEFAULT NULL,  -- 容重
+    bulk_density                    DECIMAL(16,4) DEFAULT NULL,  -- 容重
     k_value                         DECIMAL(12,6) DEFAULT NULL,  -- K值
-    moisture_content                DECIMAL(8,4)  DEFAULT NULL,  -- 含水量
-    saturated_moisture_content      DECIMAL(8,6)  DEFAULT NULL,  -- 饱和含水量
+    moisture_content                DECIMAL(16,4) DEFAULT NULL,  -- 含水量
+    saturated_moisture_content      DECIMAL(16,6) DEFAULT NULL,  -- 饱和含水量
     saturated_matrix_potential      DECIMAL(12,6) DEFAULT NULL,  -- 饱和基质势
     campbell                        DECIMAL(12,5) DEFAULT NULL,  -- Campbell参数
-    field_capacity                  DECIMAL(8,6)  DEFAULT NULL,  -- 田间持水量
-    wilting_coefficient             DECIMAL(8,6)  DEFAULT NULL,  -- 凋萎系数
+    field_capacity                  DECIMAL(16,6) DEFAULT NULL,  -- 田间持水量
+    wilting_coefficient             DECIMAL(16,6) DEFAULT NULL,  -- 凋萎系数
     saturated_hydraulic_conductivity DECIMAL(12,6) DEFAULT NULL, -- 饱和导水率
-    thermal_conductivity            DECIMAL(8,6)  DEFAULT NULL,  -- 热导率
-    specific_heat_capacity          DECIMAL(8,6)  DEFAULT NULL,  -- 比热容
+    thermal_conductivity            DECIMAL(16,6) DEFAULT NULL,  -- 热导率
+    specific_heat_capacity          DECIMAL(16,6) DEFAULT NULL,  -- 比热容
     steady_state_infiltration_rate  DECIMAL(12,6) DEFAULT NULL,  -- 稳渗率
     dem                             DECIMAL(10,6) DEFAULT NULL,  -- 高程
     created_at                      TIMESTAMP     NOT NULL DEFAULT NOW()
@@ -222,7 +222,7 @@ CREATE TABLE IF NOT EXISTS crop_leaf_area (
 COMMENT ON TABLE crop_leaf_area IS '大豆叶面积指数';
 
 -- ============================================================
--- 五、辅助表（涝渍地、试验小区、数据清单）
+-- 五、辅助表（涝渍地、试验小区、空间/文件资产索引）
 -- ============================================================
 
 -- 5.1 试验小区概况（键值对结构）
@@ -261,6 +261,40 @@ CREATE TABLE IF NOT EXISTS soil_monitor_log (
 
 COMMENT ON TABLE soil_monitor_log IS '土壤水分地温监测试验清单';
 
+-- 5.4 数据资产索引（GeoTIFF/Shapefile 等非表格文件先登记元数据，原始文件保留在文件系统）
+CREATE TABLE IF NOT EXISTS data_asset (
+    id                BIGSERIAL PRIMARY KEY,
+    asset_type        VARCHAR(20)   NOT NULL,      -- raster / vector / file
+    data_category     VARCHAR(50)   DEFAULT NULL,  -- 气象数据 / 自然地理数据 / 土壤数据 / 作物数据
+    region_name       VARCHAR(50)   DEFAULT NULL,  -- 鹤北小流域 / 浓江农场
+    asset_name        VARCHAR(200)  NOT NULL,      -- 数据名称
+    variable_name     VARCHAR(50)   DEFAULT NULL,  -- RAIN / WIND / DEM / 土地利用等
+    obs_date          DATE          DEFAULT NULL,  -- 逐日栅格日期
+    file_format       VARCHAR(20)   NOT NULL,      -- tif / shp 等
+    relative_path     TEXT          NOT NULL UNIQUE,
+    original_filename VARCHAR(255)  DEFAULT NULL,  -- 用户上传时的原始文件名
+    storage_path      TEXT          DEFAULT NULL,  -- 受管上传根下的实际存储路径
+    size_bytes        BIGINT        DEFAULT NULL,
+    checksum          VARCHAR(64)   DEFAULT NULL,  -- SHA-256 文件校验和
+    source_type       VARCHAR(20)   NOT NULL DEFAULT 'import', -- import / upload
+    upload_user_id    BIGINT        DEFAULT NULL,  -- 上传用户ID
+    crs               TEXT          DEFAULT NULL,
+    bbox              JSONB         DEFAULT NULL,  -- {"minx":..,"miny":..,"maxx":..,"maxy":..}
+    raster_width      INTEGER       DEFAULT NULL,
+    raster_height     INTEGER       DEFAULT NULL,
+    raster_count      INTEGER       DEFAULT NULL,
+    raster_dtype      VARCHAR(50)   DEFAULT NULL,
+    resolution_x      DOUBLE PRECISION DEFAULT NULL,
+    resolution_y      DOUBLE PRECISION DEFAULT NULL,
+    nodata_value      DOUBLE PRECISION DEFAULT NULL,
+    extra_metadata    JSONB         DEFAULT NULL,  -- Shapefile 组件、读取错误、驱动等扩展信息
+    created_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMP     NOT NULL DEFAULT NOW(),
+    deleted_at        TIMESTAMP     DEFAULT NULL   -- 软删除时间戳
+);
+
+COMMENT ON TABLE data_asset IS '非表格空间/文件数据资产索引';
+
 -- ============================================================
 -- 六、索引
 -- ============================================================
@@ -279,6 +313,14 @@ CREATE INDEX idx_et0_date            ON weather_et0 (obs_date);
 CREATE INDEX idx_et0_stcd            ON weather_et0 (stcd);
 CREATE INDEX idx_ground_temp_date    ON soil_ground_temperature (obs_date);
 CREATE INDEX idx_thickness_point     ON soil_thickness (point_id);
+CREATE INDEX idx_data_asset_type     ON data_asset (asset_type);
+CREATE INDEX idx_data_asset_category ON data_asset (data_category);
+CREATE INDEX idx_data_asset_region   ON data_asset (region_name);
+CREATE INDEX idx_data_asset_variable ON data_asset (variable_name);
+CREATE INDEX idx_data_asset_date     ON data_asset (obs_date);
+CREATE INDEX idx_data_asset_source   ON data_asset (source_type);
+CREATE INDEX idx_data_asset_deleted  ON data_asset (deleted_at);
+CREATE INDEX idx_data_asset_checksum ON data_asset (checksum);
 
 -- ============================================================
 -- 七、视图

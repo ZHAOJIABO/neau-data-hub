@@ -1,24 +1,40 @@
 #!/usr/bin/env python3
 """
 import_data.py — 农业数据导入脚本 (PostgreSQL)
-将 data/ 目录下的表格文件(CSV/XLS/XLSX)导入 PostgreSQL datahub 数据库
+将 data/ 目录下的表格文件(CSV/XLS/XLSX)和空间文件资产索引导入 PostgreSQL datahub 数据库
 
 用法:
     python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub
     python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only weather
     python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only soil
     python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only crop
+    python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only asset
 """
 
 import argparse
+import json
+import math
 import os
 import sys
 import re
 from datetime import datetime
 
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+BACKEND_IMPORT_CANDIDATES = [
+    os.environ.get('DATAHUB_BACKEND_DIR'),
+    os.path.abspath(os.path.join(SCRIPT_DIR, '..', 'ruoyi-fastapi-backend')),
+    # Docker compose mounts this script directory to /app/datahub_scripts while
+    # backend source lives at /app.
+    '/app',
+]
+for backend_dir in BACKEND_IMPORT_CANDIDATES:
+    if backend_dir and os.path.isdir(os.path.join(backend_dir, 'utils')):
+        sys.path.insert(0, backend_dir)
+        break
+
 try:
     import psycopg2
-    from psycopg2.extras import execute_values
+    from psycopg2.extras import Json, execute_values
 except ImportError:
     print("错误: 需要安装 psycopg2")
     print("  pip install psycopg2-binary")
@@ -43,12 +59,22 @@ def get_connection(args):
         "port": args.port,
         "user": args.user,
         "dbname": args.db,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
     }
     if args.password:
         kwargs["password"] = args.password
     conn = psycopg2.connect(**kwargs)
     conn.autocommit = False
     return conn
+
+
+def is_user_data_file(filename):
+    """排除 macOS 资源文件、隐藏文件和 Office 临时文件。"""
+    base = os.path.basename(filename)
+    return not (base.startswith('.') or base.startswith('._') or base.startswith('~$'))
 
 
 def parse_numeric(val):
@@ -100,6 +126,30 @@ def parse_date_flexible(val):
         return None
 
 
+def normalize_rel_path(path):
+    """统一数据库中保存的相对路径格式，避免不同系统路径分隔符造成重复。"""
+    return path.replace(os.sep, '/')
+
+
+def clean_float(val):
+    """将 numpy/栅格库返回的数值转换为可安全入库的 Python float。"""
+    if val is None:
+        return None
+    try:
+        fval = float(val)
+    except (TypeError, ValueError):
+        return None
+    return fval if math.isfinite(fval) else None
+
+
+def first_matching_part(parts, names):
+    """从路径片段中找到第一个匹配值。"""
+    for part in parts:
+        if part in names:
+            return part
+    return None
+
+
 # ============================================================
 # 气象数据导入
 # ============================================================
@@ -126,7 +176,10 @@ def import_weather_csv(conn, filepath, table, columns, stcd_col='STCD', date_col
     batch = []
     count = 0
     for _, row in df.iterrows():
-        stcd = str(int(row[stcd_col]))
+        raw_stcd = row[stcd_col]
+        if pd.isna(raw_stcd):
+            continue
+        stcd = str(int(raw_stcd))
         obs_date = parse_date_flexible(row[date_col])
         if obs_date is None:
             continue
@@ -136,20 +189,20 @@ def import_weather_csv(conn, filepath, table, columns, stcd_col='STCD', date_col
         batch.append(tuple(values))
         count += 1
 
-        if len(batch) >= 5000:
+        if len(batch) >= 500:
             cur.executemany(sql, batch)
+            conn.commit()
             batch = []
 
     if batch:
         cur.executemany(sql, batch)
-
-    conn.commit()
+        conn.commit()
     cur.close()
     print(f"    {count} 条记录")
     return count
 
 
-def import_weather(conn, data_dir):
+def import_weather(conn, data_dir, skip_large=False):
     """导入所有气象数据"""
     print("\n===== 导入气象数据 =====")
     total = 0
@@ -205,14 +258,17 @@ def import_weather(conn, data_dir):
                                         [('Tmean', 'tmean'), ('precip', 'precip'), ('ET0', 'et0')])
 
     # 2000-2020 大文件（多站点数据，分块读入）
-    for filename, table, columns in [
-        ('2000-2020RHU.csv', 'weather_humidity', [('relative_humidity', 'rh_mean')]),
-        ('2000-2020湿度.csv', 'weather_precipitation', [('precipitation', 'precipitation')]),
-    ]:
-        f = os.path.join(data_dir, '气象数据/鹤北小流域', filename)
-        if os.path.isfile(f):
-            print(f"\n  [导入] {filename} (大文件，分块处理...)")
-            total += import_large_weather_csv(conn, f, table, columns)
+    if skip_large:
+        print("\n  [跳过] 大文件（--skip-large）")
+    else:
+        for filename, table, columns in [
+            ('2000-2020RHU.csv', 'weather_humidity', [('relative_humidity', 'rh_mean')]),
+            ('2000-2020湿度.csv', 'weather_precipitation', [('precipitation', 'precipitation')]),
+        ]:
+            f = os.path.join(data_dir, '气象数据/鹤北小流域', filename)
+            if os.path.isfile(f):
+                print(f"\n  [导入] {filename} (大文件，分块处理...)")
+                total += import_large_weather_csv(conn, f, table, columns)
 
     print(f"\n气象数据合计: {total} 条")
     return total
@@ -334,12 +390,16 @@ def import_soil_sensor(conn, data_dir):
 
     # 查找传感器数据文件
     sensor_files = [f for f in os.listdir(soil_dir)
-                    if ('传感器' in f) and f.endswith('.xls')]
+                    if is_user_data_file(f) and ('传感器' in f) and f.endswith('.xls')]
 
     for filename in sorted(sensor_files):
         filepath = os.path.join(soil_dir, filename)
         print(f"  [导入] {filename}")
-        df = pd.read_excel(filepath)
+        try:
+            df = pd.read_excel(filepath)
+        except ValueError as exc:
+            print(f"    [跳过] 无法识别的 Excel 文件: {exc}")
+            continue
         cur = conn.cursor()
 
         sql = """
@@ -356,9 +416,9 @@ def import_soil_sensor(conn, data_dir):
             depth = parse_depth_cm(row.get('序号'))
             if depth is None:
                 continue
-            temp = parse_numeric(row.get('温度'))
-            humidity = parse_numeric(row.get('湿度'))
-            conductivity = parse_numeric(row.get('电导率'))
+            temp = parse_numeric(row.get('温度') or row.get('土壤温度'))
+            humidity = parse_numeric(row.get('湿度') or row.get('土壤湿度'))
+            conductivity = parse_numeric(row.get('电导率') or row.get('土壤电导率'))
             obs_time = row.get('上报时间')
             if obs_time is None or (isinstance(obs_time, float) and pd.isna(obs_time)):
                 continue
@@ -701,6 +761,118 @@ def import_crop(conn, data_dir):
 
 
 # ============================================================
+# 非表格空间/文件资产索引
+# ============================================================
+
+RASTER_EXTS = {'.tif', '.tiff'}
+VECTOR_EXTS = {'.shp'}
+SHAPEFILE_SIDECARE_EXTS = {
+    '.shp', '.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx', '.xml',
+}
+
+from utils.data_asset_util import (
+    classify_asset_path,
+    read_raster_metadata,
+    read_vector_metadata,
+    build_asset_record,
+)
+
+
+def upsert_data_assets(conn, records):
+    """批量写入数据资产索引。"""
+    if not records:
+        return 0
+
+    sql = """
+        INSERT INTO data_asset (
+            asset_type, data_category, region_name, asset_name, variable_name,
+            obs_date, file_format, relative_path, size_bytes, crs, bbox,
+            raster_width, raster_height, raster_count, raster_dtype,
+            resolution_x, resolution_y, nodata_value, extra_metadata, updated_at
+        )
+        VALUES (
+            %(asset_type)s, %(data_category)s, %(region_name)s, %(asset_name)s, %(variable_name)s,
+            %(obs_date)s, %(file_format)s, %(relative_path)s, %(size_bytes)s, %(crs)s, %(bbox)s,
+            %(raster_width)s, %(raster_height)s, %(raster_count)s, %(raster_dtype)s,
+            %(resolution_x)s, %(resolution_y)s, %(nodata_value)s, %(extra_metadata)s, NOW()
+        )
+        ON CONFLICT (relative_path) DO UPDATE SET
+            asset_type = EXCLUDED.asset_type,
+            data_category = EXCLUDED.data_category,
+            region_name = EXCLUDED.region_name,
+            asset_name = EXCLUDED.asset_name,
+            variable_name = EXCLUDED.variable_name,
+            obs_date = EXCLUDED.obs_date,
+            file_format = EXCLUDED.file_format,
+            size_bytes = EXCLUDED.size_bytes,
+            crs = EXCLUDED.crs,
+            bbox = EXCLUDED.bbox,
+            raster_width = EXCLUDED.raster_width,
+            raster_height = EXCLUDED.raster_height,
+            raster_count = EXCLUDED.raster_count,
+            raster_dtype = EXCLUDED.raster_dtype,
+            resolution_x = EXCLUDED.resolution_x,
+            resolution_y = EXCLUDED.resolution_y,
+            nodata_value = EXCLUDED.nodata_value,
+            extra_metadata = EXCLUDED.extra_metadata,
+            updated_at = NOW()
+    """
+
+    cur = conn.cursor()
+    db_records = []
+    for record in records:
+        row = record.copy()
+        row['bbox'] = Json(row.get('bbox')) if row.get('bbox') is not None else None
+        row['extra_metadata'] = Json(row.get('extra_metadata') or {})
+        db_records.append(row)
+    cur.executemany(sql, db_records)
+    conn.commit()
+    cur.close()
+    return len(records)
+
+
+def import_data_assets(conn, data_dir):
+    """扫描并登记非表格空间数据资产。"""
+    print("\n===== 导入非表格空间数据资产索引 =====")
+
+    asset_files = []
+    for root, _, filenames in os.walk(data_dir):
+        for filename in filenames:
+            if filename.startswith('~$') or filename == '.DS_Store':
+                continue
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in RASTER_EXTS or ext in VECTOR_EXTS:
+                asset_files.append(os.path.join(root, filename))
+
+    asset_files.sort()
+    total = 0
+    batch = []
+    raster_count = 0
+    vector_count = 0
+
+    for filepath in asset_files:
+        record = build_asset_record(data_dir, filepath)
+        if record['asset_type'] == 'raster':
+            raster_count += 1
+        elif record['asset_type'] == 'vector':
+            vector_count += 1
+        batch.append(record)
+
+        if len(batch) >= 500:
+            total += upsert_data_assets(conn, batch)
+            print(f"  已登记 {total} 个资产...", end='\r')
+            batch = []
+
+    if batch:
+        total += upsert_data_assets(conn, batch)
+
+    print(f"  栅格资产: {raster_count} 个")
+    print(f"  矢量资产: {vector_count} 个")
+    print(f"\n空间数据资产合计: {total} 个")
+    return total
+
+
+# ============================================================
 # 主函数
 # ============================================================
 
@@ -713,9 +885,12 @@ def main():
   data/
   ├── 气象数据/
   │   ├── 鹤北小流域/   (humidity_daily.csv, temperature_daily.csv, ...)
-  │   └── 浓江农场/     (humidity_daily.csv, ET0_daily_result.csv, ...)
+  │   └── 浓江农场/     (humidity_daily.csv, ET0_daily_result.csv, RAIN_2024-*.tif, ...)
   ├── 土壤数据/
   │   └── 鹤北小流域/   (土壤参数k.xls, 传感器监测数据...xls, ...)
+  ├── 自然地理数据/
+  │   ├── 鹤北小流域/   (DEM、土地利用、边界/等高线 Shapefile ...)
+  │   └── 浓江农场/     (DEM、种植结构 GeoTIFF ...)
   └── 作物数据/
       └── 鹤北小流域/   (叶面积.xlsx)
 
@@ -723,6 +898,7 @@ def main():
   python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub
   python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only weather
   python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --password mypass --only soil
+  python3 import_data.py --data-dir ./data --host localhost --user postgres --db datahub --only asset
         """,
     )
     parser.add_argument("--data-dir", required=True,
@@ -737,7 +913,7 @@ def main():
                         help="PostgreSQL 密码")
     parser.add_argument("--db", default="datahub",
                         help="数据库名 (默认: datahub)")
-    parser.add_argument("--only", choices=["weather", "soil", "crop"],
+    parser.add_argument("--only", choices=["weather", "soil", "crop", "asset"],
                         default=None, help="只导入指定类别")
     parser.add_argument("--skip-large", action="store_true",
                         help="跳过大文件(2000-2020RHU.csv等，约1800万行)")
@@ -767,27 +943,23 @@ def main():
         print(f"数据库连接失败: {e}")
         sys.exit(1)
 
-    # 如果 skip-large，临时重命名大文件以跳过
-    skip_files = []
-    if args.skip_large:
-        for fname in ['2000-2020RHU.csv', '2000-2020湿度.csv']:
-            fpath = os.path.join(args.data_dir, '气象数据/鹤北小流域', fname)
-            if os.path.isfile(fpath):
-                skip_path = fpath + '.skip'
-                os.rename(fpath, skip_path)
-                skip_files.append((fpath, skip_path))
+    # 如果 skip-large，直接跳过大文件
+    skip_large = args.skip_large
 
     try:
         grand_total = 0
 
         if args.only is None or args.only == "weather":
-            grand_total += import_weather(conn, args.data_dir)
+            grand_total += import_weather(conn, args.data_dir, skip_large=skip_large)
 
         if args.only is None or args.only == "soil":
             grand_total += import_soil(conn, args.data_dir)
 
         if args.only is None or args.only == "crop":
             grand_total += import_crop(conn, args.data_dir)
+
+        if args.only is None or args.only == "asset":
+            grand_total += import_data_assets(conn, args.data_dir)
 
         print("\n" + "=" * 60)
         print(f"  导入完成！总计: {grand_total} 条记录")
@@ -800,10 +972,6 @@ def main():
         conn.rollback()
         sys.exit(1)
     finally:
-        # 恢复被跳过的文件
-        for orig, skip in skip_files:
-            if os.path.isfile(skip):
-                os.rename(skip, orig)
         conn.close()
 
 

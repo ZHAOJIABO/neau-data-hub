@@ -292,6 +292,7 @@
 import { addMenu, delMenu, getMenu, listMenu, updateMenu } from "@/api/system/menu";
 import SvgIcon from "@/components/SvgIcon";
 import IconSelect from "@/components/IconSelect";
+import { filterHiddenMenuRows } from "@/utils/hiddenMenus";
 
 const { proxy } = getCurrentInstance();
 const { sys_show_hide, sys_normal_disable } = proxy.useDict("sys_show_hide", "sys_normal_disable");
@@ -325,7 +326,7 @@ const { queryParams, form, rules } = toRefs(data);
 function getList() {
   loading.value = true;
   listMenu(queryParams.value).then(response => {
-    menuList.value = proxy.handleTree(response.data, "menuId");
+    menuList.value = proxy.handleTree(filterHiddenMenuRows(response.data), "menuId");
     loading.value = false;
   });
 }
@@ -334,7 +335,7 @@ function getTreeselect() {
   menuOptions.value = [];
   listMenu().then(response => {
     const menu = { menuId: 0, menuName: "主类目", children: [] };
-    menu.children = proxy.handleTree(response.data, "menuId");
+    menu.children = proxy.handleTree(filterHiddenMenuRows(response.data), "menuId");
     menuOptions.value.push(menu);
   });
 }
