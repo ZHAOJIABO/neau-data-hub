@@ -292,7 +292,7 @@
 import { addMenu, delMenu, getMenu, listMenu, updateMenu } from "@/api/system/menu";
 import SvgIcon from "@/components/SvgIcon";
 import IconSelect from "@/components/IconSelect";
-import { filterHiddenMenuRows } from "@/utils/hiddenMenus";
+import { filterHiddenMenuRows } from "@/utils/displayMenus";
 
 const { proxy } = getCurrentInstance();
 const { sys_show_hide, sys_normal_disable } = proxy.useDict("sys_show_hide", "sys_normal_disable");

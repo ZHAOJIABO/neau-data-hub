@@ -1,8 +1,4 @@
-const hiddenMenuNames = new Set([
-  '系统管理',
-  '系统监控',
-  '系统工具',
-  'AI管理',
+const hiddenDisplayMenuNames = new Set([
   '若依官网'
 ])
 
@@ -11,7 +7,7 @@ function normalizeMenuName(name) {
 }
 
 export function isHiddenDisplayMenuName(name) {
-  return hiddenMenuNames.has(normalizeMenuName(name))
+  return hiddenDisplayMenuNames.has(normalizeMenuName(name))
 }
 
 export function filterHiddenDisplayRoutes(routes = []) {
