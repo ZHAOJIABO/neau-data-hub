@@ -29,6 +29,7 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
+from tqdm import tqdm
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.optimize import minimize
 
@@ -398,36 +399,45 @@ def _compute_main_time_series(
 
 
 def _ProgressCallback(n_gen, ctx: FullCanalContext):
-    """返回一个 pymoo Callback，用于在每代结束时打印进度。"""
+    """返回一个 pymoo Callback，用于在每代结束时驱动 tqdm 进度条。"""
     import time
-    from utils.log_util import logger
+    from tqdm import tqdm
 
     class _GenCallback:
         def __init__(self):
             self.start = time.time()
+            self.pbar = tqdm(
+                total=ctx.n_gen,
+                desc='渠系配水优化-NSGA',
+                unit='代',
+                leave=False,
+                dynamic_ncols=True,
+            )
             self.last_report = 0
 
         def __call__(self, algorithm):
             gen = algorithm.n_gen
             elapsed = time.time() - self.start
-            # 每 10 代或最后一代打印一次
+            # 每 10 代或最后一代把目标函数回填到 postfix
             if gen % 10 == 0 or gen >= ctx.n_gen:
-                progress = gen / ctx.n_gen * 100
                 best_f = algorithm.pop.get('F')
                 if best_f is not None and len(best_f) > 0:
                     f1 = float(best_f[:, 0].min())
                     f2 = float(best_f[:, 1].min())
                     f3 = float(best_f[:, 2].min())
-                    logger.info(
-                        '[NSGA-II] gen=%d/%d (%.1f%%) | elapsed=%.1fs | best: F1=%.3f F2=%.3f F3=%.4f',
-                        gen, ctx.n_gen, progress, elapsed, f1, f2, f3,
+                    self.pbar.set_postfix(
+                        t=f'{elapsed:.1f}s',
+                        F1=f'{f1:.2f}',
+                        F2=f'{f2:.2f}',
+                        F3=f'{f3:.4f}',
                     )
                 else:
-                    logger.info(
-                        '[NSGA-II] gen=%d/%d (%.1f%%) | elapsed=%.1fs',
-                        gen, ctx.n_gen, progress, elapsed,
-                    )
+                    self.pbar.set_postfix(t=f'{elapsed:.1f}s')
                 self.last_report = gen
+            self.pbar.update(1)
+
+        def close(self):
+            self.pbar.close()
 
     return _GenCallback()
 
@@ -471,6 +481,7 @@ def solve_full_optimization(ctx: FullCanalContext) -> FullResult:
         callback=callback,
         verbose=False,
     )
+    callback.close()
 
     F = np.asarray(res.F) if res.F is not None else None
     X = np.asarray(res.X) if res.X is not None else None
@@ -496,6 +507,13 @@ def solve_full_optimization(ctx: FullCanalContext) -> FullResult:
     all_groups: list[dict] = []
     all_laterals: list[dict] = []
     branch_schedules: list[LateralSchedule] = []
+    branch_pbar = tqdm(
+        total=len(ctx.branches),
+        desc='渠系配水优化-支斗',
+        unit='支',
+        leave=False,
+        dynamic_ncols=True,
+    )
 
     for i, branch in enumerate(ctx.branches):
         laterals = ctx.laterals_by_branch.get(branch.canal_id, [])
@@ -522,6 +540,10 @@ def solve_full_optimization(ctx: FullCanalContext) -> FullResult:
                     total_time=float(np.max([c['duration_h'] for c in channels])) if channels else 0.0,
                     max_group_flow=max((g['total_flow'] for g in groups), default=0.0),
                 ))
+        branch_pbar.set_postfix(last=branch.canal_id, n_lat=len(laterals))
+        branch_pbar.update(1)
+
+    branch_pbar.close()
 
     # 步骤3：汇总计算
     # 干渠时序

@@ -317,3 +317,201 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =====================================================================
+   玻璃拟态 · 跨页面复用样式（canalHydro / canalOptimize 共用）
+   提升到全局避免 Vue scoped CSS 失效
+   ===================================================================== */
+
+/* ---------- Hero 装饰波纹（多页面共享） ---------- */
+.hero-decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.hero-decor__wave {
+  position: absolute;
+  height: 2px;
+  width: 240%;
+  left: -70%;
+  background: linear-gradient(90deg, transparent 0%, rgba(14, 165, 233, 0.35) 50%, transparent 100%);
+  filter: blur(0.5px);
+  border-radius: 9999px;
+  animation: hero-wave-move 12s linear infinite;
+}
+.hero-decor__wave--1 { top: 28%; }
+.hero-decor__wave--2 { top: 56%; animation-duration: 16s; opacity: 0.65; }
+.hero-decor__wave--3 { top: 80%; animation-duration: 20s; opacity: 0.45; }
+@keyframes hero-wave-move {
+  0%   { transform: translateX(-30%) rotate(-2deg); }
+  50%  { transform: translateX(0%)   rotate(2deg); }
+  100% { transform: translateX(30%)  rotate(-2deg); }
+}
+
+/* ---------- canalOptimize 紫调 Hero ---------- */
+.canal-optimize-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(at 22% 22%, rgba(139, 92, 246, 0.22) 0%, transparent 55%),
+    radial-gradient(at 80% 18%, rgba(99, 102, 241, 0.28) 0%, transparent 55%),
+    radial-gradient(at 60% 88%, rgba(236, 72, 153, 0.18) 0%, transparent 55%),
+    linear-gradient(135deg, #faf5ff 0%, #f5f3ff 50%, #ede9fe 100%);
+  color: #2e1065;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+.canal-optimize-hero .hero-content {
+  position: relative;
+  z-index: 2;
+}
+.canal-optimize-eyebrow {
+  background: linear-gradient(120deg, rgba(139, 92, 246, 0.18), rgba(236, 72, 153, 0.18));
+  color: #6d28d9;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+.canal-optimize-hero .agri-page__title {
+  background: linear-gradient(120deg, #4c1d95 0%, #6d28d9 50%, #db2777 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.canal-optimize-hero .agri-page__desc {
+  color: #5b21b6;
+}
+.canal-optimize-hero .hero-decor__wave {
+  background: linear-gradient(90deg, transparent 0%, rgba(139, 92, 246, 0.4) 50%, transparent 100%);
+}
+.canal-optimize-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #6d28d9;
+}
+.canal-optimize-tag--pink {
+  background: rgba(236, 72, 153, 0.1);
+  border-color: rgba(236, 72, 153, 0.3);
+  color: #be185d;
+}
+.canal-optimize-tag--indigo {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #4338ca;
+}
+
+/* ---------- 玻璃卡片（canalHydro 蓝调 / canalOptimize 紫调兼容） ---------- */
+.glass-card {
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 24px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 8px 28px rgba(15, 42, 92, 0.08);
+}
+.glass-card :deep(.el-card__header) {
+  border-bottom: 1px solid rgba(14, 165, 233, 0.12);
+  padding: 18px 22px;
+}
+
+/* canalOptimize 紫调玻璃 */
+.canal-optimize-page .glass-card {
+  border-color: rgba(139, 92, 246, 0.2);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 8px 28px rgba(76, 29, 149, 0.08);
+}
+.canal-optimize-page .glass-card :deep(.el-card__header) {
+  border-bottom-color: rgba(139, 92, 246, 0.15);
+}
+
+/* ---------- KPI 通用卡（6 个槽位颜色不变） ---------- */
+.kpi-box {
+  position: relative;
+  border-radius: 18px;
+  padding: 18px 18px 16px;
+  color: #0b3b66;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.6));
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  box-shadow: 0 6px 18px rgba(15, 42, 92, 0.05);
+  overflow: hidden;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.kpi-box:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(15, 42, 92, 0.1); }
+.kpi-box::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, #0EA5E9, #14B8A6, #6366F1);
+}
+.kpi-box--0::after { background: linear-gradient(90deg, #0EA5E9, #38BDF8); }
+.kpi-box--1::after { background: linear-gradient(90deg, #14B8A6, #2DD4BF); }
+.kpi-box--2::after { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
+.kpi-box--3::after { background: linear-gradient(90deg, #F43F5E, #FB7185); }
+.kpi-box--4::after { background: linear-gradient(90deg, #8B5CF6, #A855F7); }
+.kpi-box--5::after { background: linear-gradient(90deg, #EC4899, #F472B6); }
+.kpi-box .kpi-label { font-size: 12px; color: #5b738e; font-weight: 600; }
+.kpi-box .kpi-value {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  font-size: 26px;
+  font-weight: 700;
+  color: #0c2c4d;
+  margin-top: 6px;
+  letter-spacing: 0.02em;
+}
+.kpi-box .kpi-hint { font-size: 11px; color: #8298b8; margin-top: 2px; }
+.kpi-box .kpi-unit {
+  margin-left: 4px;
+  font-family: inherit;
+  font-size: 0.55em;
+  font-weight: 500;
+  color: #5b738e;
+}
+.kpi-box .kpi-foot { font-size: 11px; color: #5b738e; margin-top: 6px; line-height: 1.5; }
+
+/* ---------- 结果区玻璃卡片（canalOptimize 占位 + 图表容器复用） ---------- */
+.canal-optimize-page .result-card {
+  position: relative;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.canal-optimize-page .result-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 14px 32px rgba(76, 29, 149, 0.12);
+}
+.canal-optimize-page .result-card :deep(.el-card__body) {
+  padding: 18px 22px 20px;
+}
+.canal-optimize-page .placeholder.result-card {
+  padding: 48px 28px;
+  text-align: center;
+  color: #4b3a8a;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55)),
+    radial-gradient(circle at 20% 20%, rgba(167, 139, 250, 0.18), transparent 55%),
+    radial-gradient(circle at 80% 70%, rgba(96, 165, 250, 0.16), transparent 50%);
+}
+
+/* ---------- 通用图表玻璃容器 ---------- */
+.chart-glass {
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.5), rgba(236, 254, 255, 0.2));
+  border: 1px solid rgba(14, 165, 233, 0.12);
+  box-shadow: 0 4px 12px rgba(15, 42, 92, 0.05);
+  padding: 6px;
+  border-radius: 16px;
+}
+.canal-optimize-page .chart-glass {
+  background: linear-gradient(180deg, rgba(250, 245, 255, 0.5), rgba(245, 243, 255, 0.25));
+  border-color: rgba(139, 92, 246, 0.15);
+}

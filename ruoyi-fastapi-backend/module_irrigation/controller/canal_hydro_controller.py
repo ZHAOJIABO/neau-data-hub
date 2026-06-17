@@ -62,8 +62,8 @@ async def canal_hydro_full_standard(
         sim_duration_min=payload.sim_duration_min,
         dt_sec=payload.dt_sec,
         dx_m=payload.dx_m,
-        v_max=payload.v_max,
-        v_min=payload.v_min,
+        design_flow_ratio_min=payload.design_flow_ratio_min,
+        h_safety_margin_m=payload.h_safety_margin_m,
         downstream_h_mode=payload.downstream_h_mode,
         fixed_downstream_h=payload.fixed_downstream_h,
     )

@@ -9,6 +9,8 @@ from typing import Any, Optional
 
 from exceptions.exception import ServiceException
 from module_irrigation.model.canal_full_hydro import (
+    DEFAULT_DESIGN_FLOW_RATIO_MIN,
+    DEFAULT_H_SAFETY_MARGIN_M,
     FullHydroContext,
     FullHydroResult,
     solve_full_hydro,
@@ -27,8 +29,8 @@ class CanalFullHydroService:
         sim_duration_min: int = 60,
         dt_sec: int = 30,
         dx_m: float = 200.0,
-        v_max: float = 1.5,
-        v_min: float = 0.3,
+        design_flow_ratio_min: float = DEFAULT_DESIGN_FLOW_RATIO_MIN,
+        h_safety_margin_m: float = DEFAULT_H_SAFETY_MARGIN_M,
         downstream_h_mode: str = 'normal',
         fixed_downstream_h: Optional[float] = None,
     ) -> dict[str, Any]:
@@ -40,8 +42,8 @@ class CanalFullHydroService:
             sim_duration_min,
             dt_sec,
             dx_m,
-            v_max,
-            v_min,
+            design_flow_ratio_min,
+            h_safety_margin_m,
             downstream_h_mode,
             fixed_downstream_h,
         )
@@ -55,14 +57,21 @@ class CanalFullHydroService:
         sim_duration_min: int,
         dt_sec: int,
         dx_m: float,
-        v_max: float,
-        v_min: float,
+        design_flow_ratio_min: float,
+        h_safety_margin_m: float,
         downstream_h_mode: str,
         fixed_downstream_h: Optional[float],
     ) -> dict[str, Any]:
         parent_ids: Optional[dict[str, Optional[str]]] = None
         if topology:
             parent_ids = {item['canal_id']: item.get('parent_id') for item in topology}
+        elif canals:
+            # Extract parent_id from canals payload when topology is not provided
+            parent_ids = {
+                c['canal_id']: c.get('parent_id')
+                for c in canals
+                if c.get('canal_id') and c.get('parent_id')
+            }
 
         ctx = FullHydroContext(
             main_canal_id=main_canal_id or '1',
@@ -71,8 +80,8 @@ class CanalFullHydroService:
             sim_duration_min=int(sim_duration_min),
             dt_sec=int(dt_sec),
             dx_m=float(dx_m),
-            v_max=float(v_max),
-            v_min=float(v_min),
+            design_flow_ratio_min=float(design_flow_ratio_min),
+            h_safety_margin_m=float(h_safety_margin_m),
             downstream_h_mode=downstream_h_mode,
             fixed_downstream_h=fixed_downstream_h,
         )

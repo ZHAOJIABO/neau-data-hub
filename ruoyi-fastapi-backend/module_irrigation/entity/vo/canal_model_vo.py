@@ -83,11 +83,19 @@ class FullHydroStandardRequest(BaseModel):
     topology: Optional[List[CanalTopologyItemModel]] = Field(
         default=None, description='可选显式父子拓扑；未传时按 canal_id 命名规则推断',
     )
-    sim_duration_min: int = Field(default=60, ge=1, le=720, description='仿真时长 (min)，最大 12h')
+    sim_duration_min: int = Field(default=60, ge=1, le=1440, description='仿真时长 (min)，最大 24h')
     dt_sec: int = Field(default=30, ge=30, le=60, description='时间步长 (s)')
     dx_m: float = Field(default=200.0, gt=0, description='空间步长 (m)，仅作参考')
-    v_max: float = Field(default=1.5, gt=0, description='冲刷流速上限 (m/s)')
-    v_min: float = Field(default=0.3, gt=0, description='不淤流速下限 (m/s)')
+    design_flow_ratio_min: float = Field(
+        default=0.6, gt=0, le=1.0,
+        description='流量下限比（相对设计流量 Q_design）：0<Q<ratio*Q_design 视为 v_silt，'
+                    'Q>Q_design 视为 v_scour。v_max 已取消，由设计流量隐含。',
+    )
+    h_safety_margin_m: float = Field(
+        default=0.3, gt=0, le=1.0,
+        description='水深安全余量 (m)：h_max = design_depth + h_safety_margin，'
+                    'h>h_max 视为 h_over',
+    )
     downstream_h_mode: str = Field(
         default='normal',
         description='末级渠段下游水位模式：normal=各渠段按正常水深，design=设计水深，fixed=fixed_downstream_h',

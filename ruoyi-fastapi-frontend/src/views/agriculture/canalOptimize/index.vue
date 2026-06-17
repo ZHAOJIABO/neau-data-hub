@@ -1,8 +1,8 @@
 <template>
   <div class="app-container agri-page canal-optimize-page">
-    <section class="agri-page__hero">
-      <div>
-        <span class="agri-page__eyebrow">NSGA-II OPTIMIZATION</span>
+    <section class="agri-page__hero canal-optimize-hero">
+      <div class="hero-content">
+        <span class="agri-page__eyebrow canal-optimize-eyebrow">NSGA-II OPTIMIZATION</span>
         <h1 class="agri-page__title">渠系优化配水</h1>
         <p class="agri-page__desc">
           基于 NSGA-II 多目标进化算法的全渠系三级顺序配水优化：先进行干-支连续配水优化，
@@ -21,16 +21,21 @@
         </div>
       </div>
       <div class="agri-page__tags">
-        <span>NSGA-II</span>
-        <span>全渠系三级</span>
-        <span>ECharts 动态</span>
+        <span class="canal-optimize-tag">NSGA-II</span>
+        <span class="canal-optimize-tag canal-optimize-tag--pink">全渠系三级</span>
+        <span class="canal-optimize-tag canal-optimize-tag--indigo">ECharts 动态</span>
+      </div>
+      <div class="hero-decor" aria-hidden="true">
+        <span class="hero-decor__wave hero-decor__wave--1" />
+        <span class="hero-decor__wave hero-decor__wave--2" />
+        <span class="hero-decor__wave hero-decor__wave--3" />
       </div>
     </section>
 
     <el-row :gutter="20" class="page-layout">
       <!-- 左侧：参数配置 -->
       <el-col :xs="24" :lg="8" class="config-col">
-        <el-card shadow="hover" class="config-card">
+        <el-card shadow="hover" class="config-card glass-card result-card">
           <template #header>
             <div class="card-header">
               <div>
@@ -179,7 +184,7 @@
       <!-- 右侧：所有图表独立展示 -->
       <el-col :xs="24" :lg="16" class="result-col">
         <!-- 未提交时的占位 -->
-        <div v-if="!result" class="placeholder">
+        <div v-if="!result" class="placeholder glass-card result-card">
           <div class="placeholder-title">尚未提交优化</div>
           <div class="placeholder-desc">
             提交后将在右侧依次展示：KPI 概览卡、熵权 & 目标值、Pareto 3D 前沿、全渠系配水甘特图、干渠流量/水位时序、各支渠斗渠配水甘特图、分组轮灌甘特图、损失构成、Pareto 2D 投影、支渠流量对比。
@@ -187,16 +192,30 @@
         </div>
 
         <template v-else>
-          <!-- ============ 区块 1：KPI 概览卡 ============ -->
+          <!-- ============ 区块 1：KPI 概览卡（6 卡 = 沿用 canalHydro 通用 kpi-box） ============ -->
           <div class="kpi-row">
-            <div class="kpi-card kpi-card--primary">
+            <div class="kpi-box kpi-box--0">
               <div class="kpi-label">F1 总输水时间</div>
               <div class="kpi-value">
                 {{ fmtNumber(result.topsis_summary.total_time_h, 2) }}<span class="kpi-unit">h</span>
               </div>
               <div class="kpi-foot">TOPSIS 优选方案</div>
             </div>
-            <div class="kpi-card kpi-card--danger">
+            <div class="kpi-box kpi-box--1">
+              <div class="kpi-label">TOPSIS 评分</div>
+              <div class="kpi-value">
+                {{ fmtNumber(result.summary.topsis_score, 4) }}
+              </div>
+              <div class="kpi-foot">越接近 1 越优</div>
+            </div>
+            <div class="kpi-box kpi-box--2">
+              <div class="kpi-label">F3 干渠流量波动</div>
+              <div class="kpi-value">
+                {{ fmtNumber(result.topsis_summary.flow_var, 3) }}
+              </div>
+              <div class="kpi-foot">Var(Q) 越小越平稳</div>
+            </div>
+            <div class="kpi-box kpi-box--3">
               <div class="kpi-label">F2 全渠系渗漏损失</div>
               <div class="kpi-value">
                 {{ fmtNumber(result.topsis_summary.total_loss_m3, 0) }}<span class="kpi-unit">m³</span>
@@ -207,30 +226,7 @@
                 斗 {{ fmtNumber(result.topsis_summary.lateral_loss_m3, 0) }}
               </div>
             </div>
-            <div class="kpi-card kpi-card--warning">
-              <div class="kpi-label">F3 干渠流量波动</div>
-              <div class="kpi-value">
-                {{ fmtNumber(result.topsis_summary.flow_var, 3) }}
-              </div>
-              <div class="kpi-foot">Var(Q) 越小越平稳</div>
-            </div>
-            <div class="kpi-card kpi-card--success">
-              <div class="kpi-label">TOPSIS 评分</div>
-              <div class="kpi-value">
-                {{ fmtNumber(result.summary.topsis_score, 4) }}
-              </div>
-              <div class="kpi-foot">越接近 1 越优</div>
-            </div>
-            <div class="kpi-card kpi-card--info">
-              <div class="kpi-label">干渠峰值流量 Q_max</div>
-              <div class="kpi-value">
-                {{ fmtNumber(result.summary.q_max_m3s, 3) }}<span class="kpi-unit">m³/s</span>
-              </div>
-              <div class="kpi-foot">
-                实际 {{ fmtNumber(result.main_canal.Q_total_m3s, 3) }} m³/s
-              </div>
-            </div>
-            <div class="kpi-card kpi-card--purple">
+            <div class="kpi-box kpi-box--4">
               <div class="kpi-label">渠系规模</div>
               <div class="kpi-value">
                 {{ result.summary.n_branches }}<span class="kpi-unit">支</span>
@@ -240,12 +236,21 @@
                 干渠 {{ result.summary.main_canal_id }} · 模式 {{ result.summary.mode }}
               </div>
             </div>
+            <div class="kpi-box kpi-box--5">
+              <div class="kpi-label">干渠峰值流量 Q_max</div>
+              <div class="kpi-value">
+                {{ fmtNumber(result.summary.q_max_m3s, 3) }}<span class="kpi-unit">m³/s</span>
+              </div>
+              <div class="kpi-foot">
+                实际 {{ fmtNumber(result.main_canal.Q_total_m3s, 3) }} m³/s
+              </div>
+            </div>
           </div>
 
           <!-- ============ 区块 2：熵权 / 目标值 / 损失构成 / Pareto 2D ============ -->
           <el-row :gutter="20" class="chart-row">
             <el-col :xs="24" :sm="12" :lg="12" :xl="6">
-              <el-card shadow="hover" class="chart-card">
+              <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
                     <span class="chart-title">熵权分布</span>
@@ -256,7 +261,7 @@
               </el-card>
             </el-col>
             <el-col :xs="24" :sm="12" :lg="12" :xl="6">
-              <el-card shadow="hover" class="chart-card">
+              <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
                     <span class="chart-title">目标值归一化</span>
@@ -267,7 +272,7 @@
               </el-card>
             </el-col>
             <el-col :xs="24" :sm="12" :lg="12" :xl="6">
-              <el-card shadow="hover" class="chart-card">
+              <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
                     <span class="chart-title">损失构成</span>
@@ -278,7 +283,7 @@
               </el-card>
             </el-col>
             <el-col :xs="24" :sm="12" :lg="12" :xl="6">
-              <el-card shadow="hover" class="chart-card">
+              <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
                     <span class="chart-title">Pareto 2D 投影</span>
@@ -291,7 +296,7 @@
           </el-row>
 
           <!-- ============ 区块 3：Pareto 3D 前沿 ============ -->
-          <el-card shadow="hover" class="chart-card mt16">
+          <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
@@ -307,7 +312,7 @@
           </el-card>
 
           <!-- ============ 区块 4：全渠系配水甘特图 ============ -->
-          <el-card shadow="hover" class="chart-card mt16">
+          <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
@@ -324,7 +329,7 @@
           </el-card>
 
           <!-- ============ 区块 5：干渠流量/水位时序 ============ -->
-          <el-card shadow="hover" class="chart-card mt16">
+          <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
@@ -342,7 +347,7 @@
           <!-- ============ 区块 6：损失堆叠 + 支渠损失对比 ============ -->
           <el-row :gutter="20" class="chart-row mt16">
             <el-col :xs="24" :md="12">
-              <el-card shadow="hover" class="chart-card">
+              <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
                     <div>
@@ -355,7 +360,7 @@
               </el-card>
             </el-col>
             <el-col :xs="24" :md="12">
-              <el-card shadow="hover" class="chart-card">
+              <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
                     <div>
@@ -370,7 +375,7 @@
           </el-row>
 
           <!-- ============ 区块 7：分组轮灌甘特图 ============ -->
-          <el-card v-if="result.groups?.length" shadow="hover" class="chart-card mt16">
+          <el-card v-if="result.groups?.length" shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
@@ -385,7 +390,7 @@
 
           <!-- ============ 区块 8：各支渠下的斗渠配水甘特图（每条支渠一张） ============ -->
           <div v-for="(b, idx) in result.branches" :key="b.name" class="mt16">
-            <el-card shadow="hover" class="chart-card">
+            <el-card shadow="hover" class="chart-card glass-card result-card">
               <template #header>
                 <div class="chart-header">
                   <div>
@@ -475,6 +480,7 @@ import { runFullOptimize } from '@/api/agriculture/canalOptimize'
 import { listCanal } from '@/api/agriculture/canal'
 import { Promotion } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import 'echarts-gl'
 
 defineOptions({ name: 'CanalOptimize' })
 
@@ -660,6 +666,19 @@ async function submitOptimize() {
     if (requestToken !== renderToken) return
     result.value = data
     proxy.$modal.msgSuccess('优化完成')
+    // 持久化到 sessionStorage 供渠系水动力页"从优化结果导入"使用
+    try {
+      const snapshot = {
+        savedAt: new Date().toISOString(),
+        main_canal_id: form.mainCanalId.trim(),
+        summary: data?.summary || null,
+        branches: data?.branches || [],
+        laterals: data?.laterals || [],
+        main_canal: data?.main_canal || null,
+        topsis_summary: data?.topsis_summary || null
+      }
+      sessionStorage.setItem('canal_optimize_result', JSON.stringify(snapshot))
+    } catch (_) { /* storage may be disabled, ignore */ }
     await nextTick()
     renderAllCharts()
   } catch (err) {

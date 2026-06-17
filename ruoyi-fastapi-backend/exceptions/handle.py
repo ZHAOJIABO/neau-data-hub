@@ -78,5 +78,37 @@ def handle_exception(app: FastAPI) -> None:
     # 处理其他异常
     @app.exception_handler(Exception)
     async def exception_handler(request: Request, exc: Exception) -> Response:
+        # 检查是否是数据库连接相关异常，可能是token过期导致
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)
+        
+        # asyncpg连接异常关键词
+        connection_error_keywords = [
+            'ConnectionDoesNotExistError',
+            'connection was closed',
+            'ConnectionRefusedError',
+            'ConnectionResetError',
+            'InterfaceError',
+            ' operational error',
+            'connection pool',
+        ]
+        
+        is_connection_error = exc_type in [
+            'ConnectionDoesNotExistError',
+            'ConnectionRefusedError', 
+            'ConnectionResetError',
+            'InterfaceError',
+            'OperationalError',
+        ] or any(keyword in exc_msg for keyword in connection_error_keywords)
+        
+        if is_connection_error:
+            # 数据库连接异常可能是会话过期，返回401让前端跳转登录页
+            logger.warning(f'Database connection error (possible session expired): {exc_type} - {exc_msg[:200]}')
+            return ResponseUtil.unauthorized(
+                msg='会话已过期，请重新登录',
+                data=str(exc)[:200] if exc_msg else None
+            )
+        
+        # 其他异常记录日志并返回500
         logger.exception(exc)
         return ResponseUtil.error(msg=str(exc))

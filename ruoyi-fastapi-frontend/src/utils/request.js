@@ -132,6 +132,23 @@ service.interceptors.response.use(async res => {
     const responseStatus = response?.status
     const responseCode = response?.data?.code
     const responseMsg = response?.data?.msg
+    
+    // 处理 HTTP 401 状态码，自动跳转登录页
+    if (responseStatus === 401) {
+      if (!isRelogin.show) {
+        isRelogin.show = true;
+        ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', { confirmButtonText: '重新登录', cancelButtonText: '取消', type: 'warning' }).then(() => {
+          isRelogin.show = false;
+          useUserStore().logOut().then(() => {
+            location.href = '/index';
+          })
+        }).catch(() => {
+          isRelogin.show = false;
+        });
+      }
+      return Promise.reject(new Error('登录状态已过期'))
+    }
+    
     if (responseMsg) {
       const messageType = responseStatus === 429 || responseCode === 429 ? 'warning' : 'error'
       ElMessage({ message: responseMsg, type: messageType, duration: 5 * 1000 })

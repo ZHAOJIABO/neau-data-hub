@@ -17,7 +17,7 @@
 ## 认证方式
 请求头必须携带：
 
-- `X-Irrigation-Api-Key: <你的API Key>`
+- `X-Irrigation-Api-Key: irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY`
 
 未传或错误时会返回认证失败信息。
 
@@ -118,7 +118,7 @@ soil_moisture/
 ## cURL 调用示例
 ```bash
 curl -X POST "http://8.146.227.98/api/v1/irrigation/predict" \
-  -H "X-Irrigation-Api-Key: your_api_key" \
+  -H "X-Irrigation-Api-Key: irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY" \
   -F "start_date=2026-06-01" \
   -F "initial_sm=0.29" \
   -F "sm_threshold=0.32" \
