@@ -106,7 +106,10 @@ function hasTitle(title){
 function getMenuIcon(icon, title) {
   const fallbackIcons = {
     '首页': 'dashboard',
+    '模型平台': 'dashboard',
     '灌溉决策': 'dashboard',
+    '渠系配水': 'tree-table',
+    '渠系水动力学': 'monitor',
     '农业数据': 'chart',
     '数据概览': 'dashboard',
     '气象数据': 'dashboard',
@@ -117,7 +120,8 @@ function getMenuIcon(icon, title) {
     '土壤数据': 'tree-table',
     '作物数据': 'documentation',
     '叶面积指数': 'chart',
-    '站点管理': 'international'
+    '站点管理': 'international',
+    '渠系数据': 'tree'
   }
   if (icon && availableIcons.has(icon)) {
     return icon

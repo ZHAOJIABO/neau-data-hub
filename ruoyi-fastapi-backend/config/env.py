@@ -239,6 +239,11 @@ class IrrigationApiKeySettings(BaseSettings):
     irrigation_output_dir: str = 'caches/irrigation_output'
     irrigation_device: str = 'cpu'
 
+    # 渠系模块配置
+    canal_output_dir: str = 'caches/canal_output'
+    canal_seepage_k: float = 1.0
+    canal_hydro_solver_max_min: int = 1440
+
 
 class GetConfig:
     """

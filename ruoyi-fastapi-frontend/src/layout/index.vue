@@ -69,6 +69,7 @@ function setLayout() {
 .app-wrapper {
   @include mix.clearfix;
   position: relative;
+  top: 40px;
   min-height: 100%;
   width: 100%;
   background: var(--page-bg);
@@ -80,8 +81,7 @@ function setLayout() {
 }
 
 .main-container:has(.fixed-header) {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
 }
 
 .drawer-bg {

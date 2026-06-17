@@ -264,7 +264,7 @@ async function toggleTheme(event) {
         }
 
         .user-nickname {
-          font-size: 14px;
+          font-size: 15px;
           font-weight: 600;
           color: var(--text-primary);
         }

@@ -71,15 +71,30 @@ export const constantRoutes = [
     ]
   },
   {
-    path: '/irrigation',
+    path: '/model',
     component: Layout,
     hidden: false,
+    redirect: '/model/irrigation',
+    meta: { title: '模型平台', icon: 'dashboard' },
     children: [
       {
-        path: '',
+        path: 'irrigation',
         component: () => import('@/views/agriculture/irrigation/index.vue'),
-        name: 'IrrigationPredict',
+        name: 'ModelIrrigation',
         meta: { title: '灌溉决策', icon: 'dashboard' }
+      },
+
+      {
+        path: 'canal/optimize',
+        component: () => import('@/views/agriculture/canalOptimize/index.vue'),
+        name: 'ModelCanalOptimize',
+        meta: { title: '渠系配水优化', icon: 'set-up' }
+      },
+      {
+        path: 'canal/hydro',
+        component: () => import('@/views/agriculture/canalHydro/index.vue'),
+        name: 'ModelCanalHydro',
+        meta: { title: '渠系水动力学', icon: 'monitor' }
       }
     ]
   },

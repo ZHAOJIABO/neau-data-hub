@@ -41,13 +41,10 @@ function addIframe() {
   min-height: calc(100vh - 50px);
   width: 100%;
   position: relative;
-  overflow: hidden;
 }
 
 .fixed-header + .app-main {
-  overflow-y: auto;
   scrollbar-gutter: auto;
-  height: calc(100vh - 50px);
   min-height: 0px;
 }
 
@@ -67,7 +64,6 @@ function addIframe() {
 
   .fixed-header + .app-main {
     margin-top: 84px;
-    height: calc(100vh - 84px);
     min-height: 0px;
   }
 }

@@ -75,3 +75,22 @@ insert into sys_menu values(2071, '资产查询', 2045, '1', '', '', '', '', 1, 
 insert into sys_menu values(2072, '资产上传', 2045, '2', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:dataAsset:upload', '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(2073, '资产下载', 2045, '3', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:dataAsset:download', '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(2074, '资产删除', 2045, '4', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:dataAsset:remove', '#', 'admin', current_timestamp, '', null, '');
+
+-- ============================================================
+-- 渠系数据管理（农业数据 → 渠系数据）
+-- menu_id 从 2080 起；component 路径对应 src/views/agriculture/canal/index.vue
+-- ============================================================
+
+-- 二级菜单：渠系数据（order_num=7，排在数据资产之后）
+insert into sys_menu values(2080, '渠系数据', 2000, '7', 'canal', 'agriculture/canal/index', '', '', 1, 0, 'C', '0', '0', 'agriculture:canal:list', 'tree', 'admin', current_timestamp, '', null, '渠系基础数据管理');
+
+-- 渠系数据按钮权限
+insert into sys_menu values(2081, '渠段查询', 2080, '1', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:canal:query', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2082, '渠段新增', 2080, '2', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:canal:add', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2083, '渠段修改', 2080, '3', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:canal:edit', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2084, '渠段删除', 2080, '4', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:canal:remove', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2085, '渠段导入', 2080, '5', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:canal:import', '#', 'admin', current_timestamp, '', null, '');
+
+-- 普通角色（role_id=2）默认授权渠段查询；新增/修改/删除/导入按需开放
+insert into sys_role_menu values(2, 2080);
+insert into sys_role_menu values(2, 2081);

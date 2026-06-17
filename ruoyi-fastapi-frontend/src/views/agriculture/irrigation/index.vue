@@ -7,6 +7,16 @@
         <p class="agri-page__desc">
           上传气象栅格文件并调用灌溉决策接口，生成灌溉量与土壤含水量时序结果，支持地图叠加、日期切换和播放。
         </p>
+        <div class="agri-page__siblings">
+          <router-link to="/model/canal/optimize" class="sibling-link">
+            <el-icon><Promotion /></el-icon>
+            <span>渠系配水优化</span>
+          </router-link>
+          <router-link to="/model/canal/hydro" class="sibling-link">
+            <el-icon><Promotion /></el-icon>
+            <span>渠系水动力学</span>
+          </router-link>
+        </div>
       </div>
       <div class="agri-page__tags">
         <span>模型推演</span>
@@ -295,7 +305,7 @@
 
 <script setup>
 import { getCurrentInstance, reactive, ref, computed, watch, onUnmounted } from 'vue'
-import { Loading, WarningFilled, VideoPlay, VideoPause, RefreshRight } from '@element-plus/icons-vue'
+import { Loading, WarningFilled, VideoPlay, VideoPause, RefreshRight, Promotion } from '@element-plus/icons-vue'
 import { predictIrrigation } from '@/api/agriculture/irrigation'
 import { createIrrigationZipIndex, decodeIrrigationLayer, getAvailableLayerTypes } from '@/utils/irrigationZip'
 import IrrigationMap from '@/components/IrrigationMap.vue'
@@ -669,6 +679,33 @@ onUnmounted(() => {
 <style scoped>
 .irrigation-page {
   padding-bottom: 28px;
+}
+
+.agri-page__siblings {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.sibling-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface-soft-bg);
+  border: 1px solid var(--hairline-color);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sibling-link:hover {
+  background: var(--el-color-primary-light-9);
+  border-color: var(--el-color-primary-light-5);
+  color: var(--el-color-primary);
 }
 
 .page-layout {

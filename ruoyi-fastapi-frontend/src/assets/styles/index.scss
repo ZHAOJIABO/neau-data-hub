@@ -15,6 +15,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-family: var(--font-family-sans);
+  font-size: var(--app-font-size, 15px);
   background: var(--page-bg);
   color: var(--text-primary);
 }

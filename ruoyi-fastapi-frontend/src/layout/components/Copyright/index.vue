@@ -24,7 +24,7 @@ const content = computed(() => settingsStore.footerContent)
   text-align: right;
   background-color: #f8f8f8;
   color: #666;
-  font-size: 14px;
+  font-size: 15px;
   border-top: 1px solid #e7e7e7;
   z-index: 999;
 }

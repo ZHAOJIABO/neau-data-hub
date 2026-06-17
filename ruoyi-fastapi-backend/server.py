@@ -110,6 +110,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         IrrigationService.load_models_inference_mode()
         logger.info('灌溉决策模型加载完成')
 
+        # 启动时加载渠系数据单例（直接从 DB 加载；若 DB 无数据则跳过，由管理接口导入）
+        from module_irrigation.model.canals_data import CanalsData
+        from module_agriculture.service.canal_service import CanalService
+        from config.get_db import AsyncSessionLocal
+
+        try:
+            async with AsyncSessionLocal() as session:
+                records = await CanalService.list_all_for_runtime(session)
+                CanalsData.load_from_records(records)
+                logger.info('渠系数据加载完成: 渠段 {} 条', len(CanalsData.all()))
+        except Exception as exc:
+            logger.warning('渠系数据初始化失败: {}', exc)
+
     if startup_log_enabled:
         # 短暂等待确保下面的启动日志在最后打印
         await asyncio.sleep(0.5)

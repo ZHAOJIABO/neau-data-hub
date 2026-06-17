@@ -255,7 +255,7 @@ function handleScroll() {
       color: var(--tags-item-text, #495060);
       background: var(--tags-item-bg, #fff);
       padding: 0 14px;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 500;
       border-radius: 9999px;
       margin-left: 8px;
@@ -307,7 +307,7 @@ function handleScroll() {
     list-style-type: none;
     padding: 8px;
     border-radius: 20px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     color: var(--tags-item-text, #333);
     box-shadow: var(--content-shadow-soft);
