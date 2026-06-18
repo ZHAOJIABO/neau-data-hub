@@ -19,13 +19,12 @@ export async function predictIrrigation(formData, apiKey) {
     data: formData,
     timeout: 600000,
     responseType: 'blob',
+    isToken: false,
+    repeatSubmit: false,
+    interval: 0,
     headers: {
       'Content-Type': 'multipart/form-data',
-      'X-Irrigation-Api-Key': apiKey,
-      isToken: false,
-      repeatSubmit: false,
-      interval: 0,
-      encryptResponse: false
+      'X-Irrigation-Api-Key': apiKey
     }
   })
 

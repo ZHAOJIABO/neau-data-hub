@@ -315,7 +315,7 @@ defineOptions({
 })
 
 const { proxy } = getCurrentInstance()
-const DEFAULT_IRRIGATION_API_KEY = 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
+const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
 const DEFAULT_START_DATE = '2023-05-31'
 const REQUIRED_WEATHER_PREFIXES = ['IRRAD', 'TMAX', 'TMIN', 'VAP', 'WIND', 'RAIN', 'ET0']
 const REQUIRED_WEATHER_FILE_COUNT = 105
@@ -352,7 +352,7 @@ const playbackSpeed = ref(1)
 let playbackTimer = null
 
 const form = reactive({
-  apiKey: DEFAULT_IRRIGATION_API_KEY,
+  apiKey: IRRIGATION_API_KEY,
   startDate: DEFAULT_START_DATE,
   initialSm: 0.29,
   smThreshold: 0.32,

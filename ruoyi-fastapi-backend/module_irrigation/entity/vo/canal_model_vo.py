@@ -52,11 +52,25 @@ class CanalTopologyItemModel(BaseModel):
 
 
 class FullOptimizeStandardRequest(BaseModel):
-    """全渠系三级顺序配水优化标准 JSON 请求。"""
+    """全渠系顺序配水优化标准 JSON 请求。
 
-    main_canal_id: str = Field(default='1', description='干渠编号（默认 1）')
-    canals: List[CanalInputModel] = Field(description='渠系完整数据列表（干+支+斗渠），必填')
+    一次性按拓扑自动识别所有根渠段（多根并行优化 + 节点守恒约束）。
+
+    `start_level` 控制参与优化的"起始级别"（默认 1）：
+    - start_level=1 → 优化 干-支-斗 (1-2-3)，与历史行为完全一致；
+    - start_level=2 → 优化 支-斗-农 (2-3-4)；
+    - start_level=3 → 优化 斗-农-末级 (3-4-5)；
+
+    连续 3 级（上层 → 中层 → 下层）。未落在该区间内的渠道在请求侧直接过滤。
+    """
+
+    canals: List[CanalInputModel] = Field(description='渠系完整数据列表（必填）')
     topology: Optional[List[CanalTopologyItemModel]] = Field(default=None, description='可选显式父子拓扑')
+    start_level: int = Field(
+        default=1, ge=1, le=10,
+        description='优化起始级别（连续 3 级：start_level, start_level+1, start_level+2）。'
+                    '默认 1 即 干-支-斗。',
+    )
     t_max: float = Field(default=360.0, gt=0, description='总输水时间上限 (h)')
     flow_ratio_min: float = Field(default=0.8, gt=0, description='斗渠配水流量/设计流量下限')
     flow_ratio_max: float = Field(default=1.0, gt=0, description='斗渠配水流量/设计流量上限')
@@ -73,31 +87,19 @@ class FullOptimizeStandardRequest(BaseModel):
     alpha: float = Field(default=0.5, ge=0, le=1, description='先验权重与熵权混合系数')
 
 
-class FullHydroStandardRequest(BaseModel):
-    """全渠系逐分钟水动力学仿真标准 JSON 请求。"""
+class SubtreeHydroRequest(BaseModel):
+    """两级渠段（父+子）逐分钟水动力学仿真标准 JSON 请求。
 
-    main_canal_id: str = Field(default='1', description='干渠编号（默认 1）')
+    前端选择某条父渠道，将该父渠道及其直接下级子渠道作为"两级"传入；
+    后端只仿真这两级，不做更深层 BFS。
+    - 父渠道（root）：`parent_id` 为 None 或缺省
+    - 子渠道：`parent_id == root.canal_id`
+    - 下级未传 `inflow_series` 时，按其 `design_flow` 恒定入流
+    """
+
     canals: List[CanalInputModel] = Field(
-        description='全渠系渠道数据（干+支+斗+农），每条必须带 inflow_series',
-    )
-    topology: Optional[List[CanalTopologyItemModel]] = Field(
-        default=None, description='可选显式父子拓扑；未传时按 canal_id 命名规则推断',
+        description='两级渠段数据（1 父 + ≥1 子），每条至少给 length/design_flow/底宽/边坡/纵坡/糙率',
     )
     sim_duration_min: int = Field(default=60, ge=1, le=1440, description='仿真时长 (min)，最大 24h')
     dt_sec: int = Field(default=30, ge=30, le=60, description='时间步长 (s)')
-    dx_m: float = Field(default=200.0, gt=0, description='空间步长 (m)，仅作参考')
-    design_flow_ratio_min: float = Field(
-        default=0.6, gt=0, le=1.0,
-        description='流量下限比（相对设计流量 Q_design）：0<Q<ratio*Q_design 视为 v_silt，'
-                    'Q>Q_design 视为 v_scour。v_max 已取消，由设计流量隐含。',
-    )
-    h_safety_margin_m: float = Field(
-        default=0.3, gt=0, le=1.0,
-        description='水深安全余量 (m)：h_max = design_depth + h_safety_margin，'
-                    'h>h_max 视为 h_over',
-    )
-    downstream_h_mode: str = Field(
-        default='normal',
-        description='末级渠段下游水位模式：normal=各渠段按正常水深，design=设计水深，fixed=fixed_downstream_h',
-    )
-    fixed_downstream_h: Optional[float] = Field(default=None, ge=0, description='下游固定水位 (m)，仅 downstream_h_mode=fixed 时使用')
+    dx_m: float = Field(default=50.0, gt=0, description='空间步长参考值 (m)')

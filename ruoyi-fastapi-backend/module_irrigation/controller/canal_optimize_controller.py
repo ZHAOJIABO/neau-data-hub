@@ -41,7 +41,7 @@ def _parent_ids_from_payload(payload) -> dict[str, str | None] | None:
 
 @canal_optimize_controller.post(
     '/full',
-    summary='全渠系三级顺序配水优化（NSGA-III）',
+    summary='全渠系顺序配水优化（NSGA-II，可选起始级别）',
     response_model=None,
 )
 async def optimize_full(
@@ -50,18 +50,17 @@ async def optimize_full(
         Body(description='全渠系三级优化标准 JSON 请求体'),
     ],
 ) -> JSONResponse:
-    """全渠系三级顺序配水优化：干-支连续配水 + 支-斗轮灌分组。"""
+    """全渠系三级顺序配水优化：按拓扑自动识别所有根渠段并行优化。"""
     canal_count = len(payload.canals)
     logger.info(
-        'canal optimize full request: main={}, canals={}, pop={}, gen={}, seed={}',
-        payload.main_canal_id,
+        'canal optimize full request: canals={}, start_level={}, pop={}, gen={}, seed={}',
         canal_count,
+        payload.start_level,
         payload.pop_size,
         payload.n_gen,
         payload.seed,
     )
     data = await CanalOptimizeService.run_full(
-        main_canal_id=payload.main_canal_id,
         t_max=payload.t_max,
         flow_ratio_min=payload.flow_ratio_min,
         flow_ratio_max=payload.flow_ratio_max,
@@ -76,6 +75,7 @@ async def optimize_full(
         pref_weight_loss=payload.pref_weight_loss,
         pref_weight_flow_var=payload.pref_weight_flow_var,
         alpha=payload.alpha,
+        start_level=payload.start_level,
         canal_records=_canal_records_from_payload(payload),
         parent_ids=_parent_ids_from_payload(payload),
     )

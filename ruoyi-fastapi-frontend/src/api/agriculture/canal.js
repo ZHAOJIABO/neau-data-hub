@@ -1,13 +1,17 @@
 import request from '@/utils/request'
 
-function buildHeaders(apiKey) {
+const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
+
+function buildRequestConfig(apiKey) {
   return {
-    'X-Irrigation-Api-Key': apiKey,
+    timeout: 600000,
     isToken: false,
     repeatSubmit: false,
     interval: 0,
-    encryptResponse: false,
-    'Content-Type': 'application/json'
+    headers: {
+      'X-Irrigation-Api-Key': apiKey,
+      'Content-Type': 'application/json'
+    }
   }
 }
 
@@ -17,13 +21,12 @@ function unwrap(response) {
     : response
 }
 
-export async function runFullHydro(payload, apiKey) {
+export async function runSubtreeHydro(payload, apiKey = IRRIGATION_API_KEY) {
   const response = await request({
-    url: '/api/v1/irrigation/canal/hydro/full/standard',
+    url: '/api/v1/irrigation/canal/hydro/subtree/standard',
     method: 'post',
     data: payload,
-    timeout: 600000,
-    headers: buildHeaders(apiKey)
+    ...buildRequestConfig(apiKey)
   })
   return unwrap(response)
 }
@@ -88,5 +91,15 @@ export function getManagementTopology() {
     url: '/agriculture/canal/topology',
     method: 'get'
   })
+}
+
+export async function runFullOptimize(payload, apiKey = IRRIGATION_API_KEY) {
+  const response = await request({
+    url: '/api/v1/irrigation/canal/optimize/full',
+    method: 'post',
+    data: payload,
+    ...buildRequestConfig(apiKey)
+  })
+  return unwrap(response)
 }
 

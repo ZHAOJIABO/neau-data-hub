@@ -11,18 +11,22 @@
         </p>
         <div class="agri-page__siblings">
           <router-link to="/model/irrigation" class="sibling-link">
-            <el-icon><Promotion /></el-icon>
+            <el-icon>
+              <Promotion />
+            </el-icon>
             <span>灌溉决策</span>
           </router-link>
           <router-link to="/model/canal/hydro" class="sibling-link">
-            <el-icon><Promotion /></el-icon>
+            <el-icon>
+              <Promotion />
+            </el-icon>
             <span>渠系水动力学</span>
           </router-link>
         </div>
       </div>
       <div class="agri-page__tags">
         <span class="canal-optimize-tag">NSGA-II</span>
-        <span class="canal-optimize-tag canal-optimize-tag--pink">全渠系三级</span>
+        <span class="canal-optimize-tag canal-optimize-tag--pink">前端选根渠段</span>
         <span class="canal-optimize-tag canal-optimize-tag--indigo">ECharts 动态</span>
       </div>
       <div class="hero-decor" aria-hidden="true">
@@ -40,7 +44,7 @@
             <div class="card-header">
               <div>
                 <div class="card-title">渠系优化配水（NSGA-II）</div>
-                <div class="card-desc">配置超参与土壤参数，提交后查看 Pareto + 配水方案。</div>
+                <div class="card-desc">加载渠系数据并选择根渠段，自动收集下游三级渠道提交后端计算。</div>
               </div>
               <el-tag :type="resultError ? 'danger' : result ? 'success' : 'info'">
                 {{ resultError ? '接口异常' : result ? '方案已生成' : '待提交' }}
@@ -49,134 +53,176 @@
           </template>
 
           <div class="config-body">
-          <el-alert
-            type="info"
-            :closable="false"
-            show-icon
-            title="算法超参默认（POP=80, GEN=60）保证秒级响应；如需更高精度可调大 pop/n_gen。"
-            class="mb16"
-          />
+            <el-alert type="info" :closable="false" show-icon title="算法超参默认（POP=80, GEN=60）保证秒级响应；如需更高精度可调大 pop/n_gen。"
+              class="mb16" />
 
-          <el-form ref="formRef" :model="form" label-position="top" size="small" class="opt-form">
-            <el-form-item label="接口 API Key" required>
-              <el-input
-                v-model="form.apiKey"
-                type="password"
-                show-password
-                clearable
-                placeholder="X-Irrigation-Api-Key"
-              />
-            </el-form-item>
+            <el-form ref="formRef" :model="form" label-position="top" size="small" class="opt-form">
+              <el-form-item label="接口 API Key" required>
+                <el-input v-model="form.apiKey" type="password" show-password clearable
+                  placeholder="X-Irrigation-Api-Key" />
+              </el-form-item>
 
-            <el-form-item label="干渠编号">
-              <el-input v-model="form.mainCanalId" placeholder="默认 1" />
-            </el-form-item>
+              <!-- 加载数据 -->
+              <div class="db-row mb12">
+                <el-button size="small" type="primary" plain @click="loadFromDb" :loading="loadingDb">
+                  加载渠系数据
+                </el-button>
+                <span class="muted-text">已加载 {{ dbCanals.length }} 条</span>
+              </div>
 
-            <el-row :gutter="12">
-              <el-col :span="12">
-                <el-form-item label="t_max (h)">
-                  <el-input-number v-model="form.tMax" :min="1" :max="2000" :step="1" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="最大组数">
-                  <el-input-number v-model="form.maxGroups" :min="2" :max="6" :step="1" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
+              <!-- 根渠段选择 -->
+              <el-form-item label="选择根渠段" required>
+                <el-select v-model="form.rootCanalId" placeholder="请先加载渠系数据，再选择根渠段" filterable clearable
+                  style="width: 100%" :disabled="dbCanals.length === 0" @change="onRootChange">
+                  <el-option v-for="c in dbCanals" :key="c.canal_id"
+                    :label="`${c.canal_id}${c.canal_name ? ' · ' + c.canal_name : ''} (L${c.level || '?'})`"
+                    :value="c.canal_id" />
+                </el-select>
+              </el-form-item>
 
-            <el-row :gutter="12">
-              <el-col :span="12">
-                <el-form-item label="q/qd 下限">
-                  <el-input-number v-model="form.flowRatioMin" :min="0.1" :max="1" :step="0.05" :precision="2" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="q/qd 上限">
-                  <el-input-number v-model="form.flowRatioMax" :min="0.1" :max="1.5" :step="0.05" :precision="2" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
+              <!-- 自动显示将传入的子树预览 -->
+              <div v-if="collectedSubtree" class="subtree-preview mb12">
+                <div class="subtree-preview__label">
+                  将传入 {{ collectedSubtree.canals.length }} 条渠道（3级）：
+                </div>
+                <div class="subtree-preview__levels">
+                  <el-tag size="small" class="mr6" type="info">
+                    干 {{ collectedSubtree.stats.level_upper }}级: {{ collectedSubtree.stats.n_upper }}条
+                  </el-tag>
+                  <el-tag size="small" class="mr6" type="success">
+                    支 {{ collectedSubtree.stats.level_middle }}级: {{ collectedSubtree.stats.n_middle }}条
+                  </el-tag>
+                  <el-tag size="small" type="warning">
+                    斗 {{ collectedSubtree.stats.level_lower }}级: {{ collectedSubtree.stats.n_lower }}条
+                  </el-tag>
+                </div>
+              </div>
 
-            <el-form-item label="最小组数">
-              <el-input-number v-model="form.minGroups" :min="2" :max="6" :step="1" style="width: 100%" />
-            </el-form-item>
+              <div v-if="!form.rootCanalId && dbCanals.length > 0" class="mb12">
+                <el-alert type="warning" :closable="false" show-icon title="请在上方选择一条根渠段" />
+              </div>
 
-            <el-divider content-position="left">NSGA-II 超参</el-divider>
+              <div class="divider-soft" />
 
-            <el-row :gutter="12">
-              <el-col :span="12">
-                <el-form-item label="种群 pop">
-                  <el-input-number v-model="form.popSize" :min="10" :max="600" :step="10" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="迭代 n_gen">
-                  <el-input-number v-model="form.nGen" :min="10" :max="2000" :step="50" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
+              <el-alert type="info" :closable="false" show-icon class="mb12">
+                根渠段级别自动推断为 start_level={{ inferredStartLevel }}，
+                参与区间 [{{ inferredStartLevel }}-{{ inferredStartLevel + 1 }}-{{ inferredStartLevel + 2 }}]。
+              </el-alert>
 
-            <el-form-item label="随机种子">
-              <el-input-number v-model="form.seed" :min="0" :max="999" :step="1" style="width: 100%" />
-            </el-form-item>
+              <el-row :gutter="12">
+                <el-col :span="12">
+                  <el-form-item label="t_max (h)">
+                    <el-input-number v-model="form.tMax" :min="1" :max="2000" :step="1" style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="最大组数">
+                    <el-input-number v-model="form.maxGroups" :min="2" :max="6" :step="1" style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
 
-            <el-divider content-position="left">土壤参数</el-divider>
+              <el-row :gutter="12">
+                <el-col :span="12">
+                  <el-form-item label="q/qd 下限">
+                    <el-input-number v-model="form.flowRatioMin" :min="0.1" :max="1" :step="0.05" :precision="2"
+                      style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="q/qd 上限">
+                    <el-input-number v-model="form.flowRatioMax" :min="0.1" :max="1.5" :step="0.05" :precision="2"
+                      style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
 
-            <el-row :gutter="12">
-              <el-col :span="12">
-                <el-form-item label="渗透指数 m">
-                  <el-input-number v-model="form.permeabilityIndexM" :min="0" :step="0.05" :precision="3" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="渗透系数 A">
-                  <el-input-number v-model="form.permeabilityCoefficientA" :min="0" :step="0.1" :precision="3" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
+              <el-form-item label="最小组数">
+                <el-input-number v-model="form.minGroups" :min="2" :max="6" :step="1" style="width: 100%" />
+              </el-form-item>
 
-            <el-divider content-position="left">目标权重</el-divider>
+              <el-divider content-position="left">NSGA-II 超参</el-divider>
 
-            <el-row :gutter="12">
-              <el-col :span="8">
-                <el-form-item label="w_时间">
-                  <el-input-number v-model="form.prefWeightTime" :min="0" :max="1" :step="0.05" :precision="2" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="w_损失">
-                  <el-input-number v-model="form.prefWeightLoss" :min="0" :max="1" :step="0.05" :precision="2" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="w_波动">
-                  <el-input-number v-model="form.prefWeightFlowVar" :min="0" :max="1" :step="0.05" :precision="2" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
+              <el-row :gutter="12">
+                <el-col :span="12">
+                  <el-form-item label="种群 pop">
+                    <el-input-number v-model="form.popSize" :min="10" :max="600" :step="10" style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="迭代 n_gen">
+                    <el-input-number v-model="form.nGen" :min="10" :max="2000" :step="50" style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
 
-            <el-form-item label="混合系数 α">
-              <el-input-number v-model="form.alpha" :min="0" :max="1" :step="0.05" :precision="2" style="width: 100%" />
-            </el-form-item>
+              <el-form-item label="随机种子">
+                <el-input-number v-model="form.seed" :min="0" :max="999" :step="1" style="width: 100%" />
+              </el-form-item>
 
-            <div class="action-row">
-              <el-button type="primary" :loading="submitting" @click="submitOptimize" class="action-primary">
-                开始优化
-              </el-button>
-              <el-button :disabled="!result" @click="resetResult" class="action-secondary">
-                清空结果
-              </el-button>
-            </div>
-          </el-form>
+              <el-divider content-position="left">土壤参数</el-divider>
 
-          <el-divider content-position="left">接口说明</el-divider>
-          <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="优化接口">/api/v1/irrigation/canal/optimize/full</el-descriptions-item>
-            <el-descriptions-item label="请求方式">POST / application/json</el-descriptions-item>
-            <el-descriptions-item label="鉴权头">X-Irrigation-Api-Key</el-descriptions-item>
-            <el-descriptions-item label="返回">结构化 JSON</el-descriptions-item>
-          </el-descriptions>
+              <el-row :gutter="12">
+                <el-col :span="12">
+                  <el-form-item label="渗透指数 m">
+                    <el-input-number v-model="form.permeabilityIndexM" :min="0" :step="0.05" :precision="3"
+                      style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="渗透系数 A">
+                    <el-input-number v-model="form.permeabilityCoefficientA" :min="0" :step="0.1" :precision="3"
+                      style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+
+              <el-divider content-position="left">目标权重</el-divider>
+
+              <el-row :gutter="12">
+                <el-col :span="8">
+                  <el-form-item label="w_时间">
+                    <el-input-number v-model="form.prefWeightTime" :min="0" :max="1" :step="0.05" :precision="2"
+                      style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="w_损失">
+                    <el-input-number v-model="form.prefWeightLoss" :min="0" :max="1" :step="0.05" :precision="2"
+                      style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="w_波动">
+                    <el-input-number v-model="form.prefWeightFlowVar" :min="0" :max="1" :step="0.05" :precision="2"
+                      style="width: 100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+
+              <el-form-item label="混合系数 α">
+                <el-input-number v-model="form.alpha" :min="0" :max="1" :step="0.05" :precision="2"
+                  style="width: 100%" />
+              </el-form-item>
+
+              <div class="action-row">
+                <el-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="submitOptimize"
+                  class="action-primary">
+                  开始优化
+                </el-button>
+                <el-button :disabled="!result" @click="resetResult" class="action-secondary">
+                  清空结果
+                </el-button>
+              </div>
+            </el-form>
+
+            <el-divider content-position="left">接口说明</el-divider>
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="优化接口">/api/v1/irrigation/canal/optimize/full</el-descriptions-item>
+              <el-descriptions-item label="请求方式">POST / application/json</el-descriptions-item>
+              <el-descriptions-item label="鉴权头">X-Irrigation-Api-Key</el-descriptions-item>
+              <el-descriptions-item label="返回">结构化 JSON</el-descriptions-item>
+            </el-descriptions>
           </div>
         </el-card>
       </el-col>
@@ -233,11 +279,11 @@
                 / {{ nLaterals }}<span class="kpi-unit">斗</span>
               </div>
               <div class="kpi-foot">
-                干渠 {{ result.summary.main_canal_id }} · 模式 {{ result.summary.mode }}
+                {{ result.summary.n_roots }} 条根渠段（自动识别） · 模式 {{ result.summary.mode }}
               </div>
             </div>
             <div class="kpi-box kpi-box--5">
-              <div class="kpi-label">干渠峰值流量 Q_max</div>
+              <div class="kpi-label">根渠段峰值流量（合计）</div>
               <div class="kpi-value">
                 {{ fmtNumber(result.summary.q_max_m3s, 3) }}<span class="kpi-unit">m³/s</span>
               </div>
@@ -246,6 +292,53 @@
               </div>
             </div>
           </div>
+
+          <!-- 根渠段清单 -->
+          <el-card v-if="result.roots?.length" shadow="hover" class="result-card glass-card mb16">
+            <template #header>
+              <div class="card-header">
+                <div>
+                  <div class="card-title">根渠段清单（自动识别）</div>
+                  <div class="card-desc">本次优化覆盖的全部根渠段及其子网络规模。</div>
+                </div>
+                <el-tag size="small" type="primary">
+                  共 {{ result.summary.n_roots }} 条根
+                </el-tag>
+              </div>
+            </template>
+            <el-table :data="result.roots" border size="small" stripe>
+              <el-table-column prop="root_id" label="根渠段" min-width="100" />
+              <el-table-column prop="n_branches" label="支渠数" min-width="80" />
+              <el-table-column prop="n_laterals" label="斗渠数" min-width="80" />
+              <el-table-column label="峰值流量 (m³/s)" min-width="140">
+                <template #default="{ row }">
+                  {{ fmtNumber(row.q_max_m3s, 3) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="输水时间 (h)" min-width="120">
+                <template #default="{ row }">
+                  {{ fmtNumber(row.total_time_h, 2) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="渗漏损失 (m³)" min-width="140">
+                <template #default="{ row }">
+                  {{ fmtNumber(row.total_loss_m3, 0) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="TOPSIS 评分" min-width="120">
+                <template #default="{ row }">
+                  {{ fmtNumber(row.topsis_score, 4) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" min-width="80">
+                <template #default="{ row }">
+                  <el-tag :type="row.ok ? 'success' : 'danger'" size="small">
+                    {{ row.ok ? '成功' : '失败' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
 
           <!-- ============ 区块 2：熵权 / 目标值 / 损失构成 / Pareto 2D ============ -->
           <el-row :gutter="20" class="chart-row">
@@ -320,7 +413,8 @@
                   <span class="chart-sub">干-支连续配水 + 支-斗轮灌（组间轮灌、组内续灌）</span>
                 </div>
                 <div class="chart-tags">
-                  <el-tag size="small" type="primary">干渠 {{ fmtNumber(result.main_canal.duration_h || result.main_canal.t_max_h, 2) }} h</el-tag>
+                  <el-tag size="small" type="primary">干渠 {{ fmtNumber(result.main_canal.duration_h ||
+                    result.main_canal.t_max_h, 2) }} h</el-tag>
                   <el-tag size="small" type="warning">峰值 {{ fmtNumber(result.main_canal.Q_total_m3s, 3) }} m³/s</el-tag>
                 </div>
               </div>
@@ -417,13 +511,7 @@
               </template>
               <div :ref="el => setBranchGanttRef(el, idx)" class="chart chart-tall" />
               <!-- 斗渠详细数据表 -->
-              <el-table
-                :data="getBranchLaterals(b.name)"
-                size="small"
-                stripe
-                border
-                class="mt12 lateral-table"
-              >
+              <el-table :data="getBranchLaterals(b.name)" size="small" stripe border class="mt12 lateral-table">
                 <el-table-column prop="name" label="斗渠" width="110" />
                 <el-table-column label="所属组" width="80" align="center">
                   <template #default="{ row }">
@@ -475,19 +563,20 @@
 </template>
 
 <script setup>
-import { getCurrentInstance, reactive, ref, watch, nextTick, onUnmounted, computed } from 'vue'
-import { runFullOptimize } from '@/api/agriculture/canalOptimize'
-import { listCanal } from '@/api/agriculture/canal'
+import { computed, getCurrentInstance, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { Promotion } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import 'echarts-gl'
 
+import { runFullOptimize, listCanal } from '@/api/agriculture/canal'
+
 defineOptions({ name: 'CanalOptimize' })
 
 const { proxy } = getCurrentInstance()
-const DEFAULT_API_KEY = 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
+const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
 
 const submitting = ref(false)
+const loadingDb = ref(false)
 const result = ref(null)
 const resultError = ref('')
 
@@ -517,8 +606,8 @@ const branchGanttCharts = []
 let renderToken = 0
 
 const form = reactive({
-  apiKey: DEFAULT_API_KEY,
-  mainCanalId: '1',
+  apiKey: IRRIGATION_API_KEY,
+  rootCanalId: '',
   tMax: 360,
   flowRatioMin: 0.8,
   flowRatioMax: 1.0,
@@ -535,43 +624,120 @@ const form = reactive({
   alpha: 0.5
 })
 
-const COLOR_PALETTE = [
-  '#5b8def', '#22c55e', '#f97316', '#a855f7', '#ec4899',
-  '#14b8a6', '#facc15', '#06b6d4', '#84cc16', '#ef4444',
-  '#6366f1', '#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6'
-]
+// ── 数据库渠段 ──
+const dbCanals = ref([])
 
-const nLaterals = computed(() => (result.value?.laterals || []).length)
-const paretoSelectedCount = computed(() => (result.value?.pareto || []).filter(p => p.selected).length)
-
-function fmtNumber(value, digits = 2) {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return '--'
+// ── 推断 start_level ──
+const inferredStartLevel = computed(() => {
+  if (!form.rootCanalId) return 1
+  const canal = dbCanals.value.find(c => c.canal_id === form.rootCanalId)
+  if (!canal) return 1
+  const lv = canal.level
+  if (lv !== null && lv !== undefined && String(lv).trim() !== '') {
+    const parsed = parseInt(String(lv).trim(), 10)
+    if (!isNaN(parsed) && parsed >= 1) return parsed
   }
-  const num = Number(value)
-  if (!Number.isFinite(num)) {
-    return '--'
+  return 1
+})
+
+// ── 收集子树（根 + 下游3级） ──
+const collectedSubtree = computed(() => {
+  if (!form.rootCanalId) return null
+  const root = dbCanals.value.find(c => c.canal_id === form.rootCanalId)
+  if (!root) return null
+
+  const lv = inferredStartLevel.value
+  const upper = lv
+  const middle = lv + 1
+  const lower = lv + 2
+  const levelSet = new Set([upper, middle, lower])
+
+  // 收集 level in [upper, lower] 的所有渠段
+  const included = new Set()
+  const queue = [form.rootCanalId]
+  while (queue.length) {
+    const pid = queue.shift()
+    included.add(pid)
+    if (levelSet.size === 3 && included.size > 50) break // 防死循环
+    for (const c of dbCanals.value) {
+      if (c.parent_id === pid && !included.has(c.canal_id)) {
+        included.add(c.canal_id)
+        queue.push(c.canal_id)
+      }
+    }
   }
-  return num.toFixed(digits)
+
+  const canals = dbCanals.value.filter(c => included.has(c.canal_id))
+
+  // 构建 topology
+  const topology = canals
+    .filter(c => c.parent_id != null)
+    .map(c => ({ canal_id: c.canal_id, parent_id: c.parent_id }))
+
+  // 统计
+  const levelCounts = { upper: 0, middle: 0, lower: 0 }
+  for (const c of canals) {
+    const lv2 = parseInt(String(c.level || '').trim(), 10)
+    if (lv2 === upper) levelCounts.upper++
+    else if (lv2 === middle) levelCounts.middle++
+    else if (lv2 === lower) levelCounts.lower++
+  }
+
+  return {
+    canals,
+    topology,
+    stats: {
+      level_upper: upper,
+      level_middle: middle,
+      level_lower: lower,
+      n_upper: levelCounts.upper,
+      n_middle: levelCounts.middle,
+      n_lower: levelCounts.lower,
+    }
+  }
+})
+
+const canSubmit = computed(() => {
+  return form.rootCanalId && collectedSubtree.value && collectedSubtree.value.canals.length > 0
+})
+
+function onRootChange() {
+  // 重置结果
+  resetResult()
 }
 
-function getColor(i) {
-  return COLOR_PALETTE[i % COLOR_PALETTE.length]
-}
-
-function getBranchLaterals(branchName) {
-  if (!result.value) return []
-  return (result.value.laterals || [])
-    .filter(l => l.parent === branchName || l.parent_id === branchName)
-    .slice()
-    .sort((a, b) => {
-      if (a.group !== b.group) return a.group - b.group
-      return a.name.localeCompare(b.name)
-    })
-}
-
-function setBranchGanttRef(el, idx) {
-  if (el) branchGanttRefs[idx] = el
+// ── 加载数据库渠段 ──
+async function loadFromDb() {
+  loadingDb.value = true
+  try {
+    const res = await listCanal({ pageNum: 1, pageSize: 200 })
+    const rows = res?.rows || res?.data?.rows || []
+    dbCanals.value = rows.map(r => ({
+      canal_id: r.canal_id ?? r.canalId,
+      canal_name: r.canal_name ?? r.canalName,
+      parent_id: r.parent_id ?? r.parentId ?? null,
+      level: r.level != null ? String(r.level) : null,
+      length: parseFloat(r.length ?? r.lengthM ?? 0),
+      design_flow: parseFloat(r.design_flow ?? r.designFlow ?? r.designQM3s ?? 0),
+      design_depth: parseFloat(r.design_depth ?? r.designDepth ?? 0),
+      top_width: parseFloat(r.top_width ?? r.topWidth ?? 0),
+      bottom_width: parseFloat(r.bottom_width ?? r.bottomWidth ?? 0),
+      slope: parseFloat(r.slope ?? 0),
+      side_slope: parseFloat(r.side_slope ?? r.sideSlopeM ?? 1.5),
+      roughness: parseFloat(r.roughness ?? r.manningN ?? 0.015),
+      gate_height: parseFloat(r.gate_height ?? r.gateHeightM ?? 0),
+      gate_width: parseFloat(r.gate_width ?? r.gateWidthM ?? 0),
+      min_gate_opening: parseFloat(r.min_gate_opening ?? r.minGateOpeningM ?? 0),
+      max_gate_opening: parseFloat(r.max_gate_opening ?? r.maxGateOpeningM ?? 0),
+      water_demand: parseFloat(r.water_demand ?? r.waterDemand ?? 0),
+    }))
+    form.rootCanalId = ''
+    proxy.$modal.msgSuccess(`已加载 ${dbCanals.value.length} 条渠段`)
+  } catch (err) {
+    proxy.$modal.msgError('获取渠系数据失败：' + (err?.message || err))
+  } finally {
+    loadingDb.value = false
+  }
 }
 
 function resetResult() {
@@ -595,90 +761,101 @@ function destroyCharts() {
   branchGanttRefs.length = 0
 }
 
+function fmtNumber(value, digits = 2) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return '--'
+  }
+  const num = Number(value)
+  if (!Number.isFinite(num)) {
+    return '--'
+  }
+  return num.toFixed(digits)
+}
+
+const COLOR_PALETTE = [
+  '#5b8def', '#22c55e', '#f97316', '#a855f7', '#ec4899',
+  '#14b8a6', '#facc15', '#06b6d4', '#84cc16', '#ef4444',
+  '#6366f1', '#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6'
+]
+
+function getColor(i) {
+  return COLOR_PALETTE[i % COLOR_PALETTE.length]
+}
+
+const nLaterals = computed(() => (result.value?.laterals || []).length)
+const paretoSelectedCount = computed(() => (result.value?.pareto || []).filter(p => p.selected).length)
+
+function getBranchLaterals(branchName) {
+  if (!result.value) return []
+  return (result.value.laterals || [])
+    .filter(l => l.parent === branchName || l.parent_id === branchName)
+    .slice()
+    .sort((a, b) => {
+      if (a.group !== b.group) return a.group - b.group
+      return a.name.localeCompare(b.name)
+    })
+}
+
+function setBranchGanttRef(el, idx) {
+  if (el) branchGanttRefs[idx] = el
+}
+
 async function submitOptimize() {
+  if (!canSubmit.value) return
   if (!form.apiKey.trim()) {
     proxy.$modal.msgError('请输入接口 API Key')
     return
   }
-  if (!form.mainCanalId.trim()) {
-    proxy.$modal.msgError('请输入干渠编号')
-    return
-  }
+
   const requestToken = ++renderToken
   result.value = null
   resultError.value = ''
   destroyCharts()
   submitting.value = true
 
-  let canals = []
   try {
-    const canalRes = await listCanal({ canalName: '', pageNum: 1, pageSize: 1000 })
-    canals = canalRes?.rows || canalRes || []
-    if (!canals.length) {
-      canals = canalRes?.data?.rows || []
+    const st = collectedSubtree.value
+    const payload = {
+      canals: st.canals.map(c => ({
+        canal_id: c.canal_id,
+        canal_name: c.canal_name || null,
+        level: c.level,
+        length: c.length,
+        design_flow: c.design_flow,
+        design_depth: c.design_depth,
+        top_width: c.top_width,
+        bottom_width: c.bottom_width,
+        slope: c.slope,
+        side_slope: c.side_slope,
+        roughness: c.roughness,
+        gate_height: c.gate_height,
+        gate_width: c.gate_width,
+        min_gate_opening: c.min_gate_opening,
+        max_gate_opening: c.max_gate_opening,
+        water_demand: c.water_demand,
+        parent_id: c.parent_id,
+      })),
+      topology: st.topology,
+      start_level: inferredStartLevel.value,
+      t_max: form.tMax,
+      flow_ratio_min: form.flowRatioMin,
+      flow_ratio_max: form.flowRatioMax,
+      min_groups: form.minGroups,
+      max_groups: form.maxGroups,
+      pop_size: form.popSize,
+      n_gen: form.nGen,
+      seed: form.seed,
+      permeability_index: form.permeabilityIndexM,
+      permeability_coefficient: form.permeabilityCoefficientA,
+      pref_weight_time: form.prefWeightTime,
+      pref_weight_loss: form.prefWeightLoss,
+      pref_weight_flow_var: form.prefWeightFlowVar,
+      alpha: form.alpha,
     }
-  } catch (e) {
-    if (requestToken !== renderToken) return
-    proxy.$modal.msgError('获取渠系数据失败：' + (e?.message || e))
-    submitting.value = false
-    return
-  }
-
-  const payload = {
-    main_canal_id: form.mainCanalId.trim(),
-    canals: canals.map(c => ({
-      canal_id: c.canalId || c.canal_id,
-      canal_name: c.canalName || c.canal_name,
-      level: c.level,
-      length: parseFloat(c.lengthM ?? c.length ?? 0),
-      design_flow: parseFloat(c.designQM3s ?? c.designQ3s ?? c.designFlow ?? c.design_flow ?? 0),
-      design_depth: parseFloat(c.designDepthM ?? c.designDepth ?? c.design_depth ?? 0),
-      top_width: parseFloat(c.designTopWidthM ?? c.topWidth ?? c.top_width ?? 0),
-      bottom_width: parseFloat(c.designBottomWidthM ?? c.bottomWidth ?? c.bottom_width ?? 0),
-      slope: parseFloat(c.designSlope ?? c.slope ?? 0),
-      side_slope: parseFloat(c.sideSlopeM ?? c.sideSlope ?? c.side_slope ?? 0),
-      roughness: parseFloat(c.manningN ?? c.roughness ?? c.roughness_n ?? 0),
-      gate_height: parseFloat(c.gateHeightM ?? c.gateHeight ?? c.gate_height ?? 0),
-      gate_width: parseFloat(c.gateWidthM ?? c.gateWidth ?? c.gate_width ?? 0),
-      min_gate_opening: parseFloat(c.minGateOpeningM ?? c.minGateOpening ?? c.min_gate_opening ?? 0),
-      max_gate_opening: parseFloat(c.maxGateOpeningM ?? c.maxGateOpening ?? c.max_gate_opening ?? 0),
-      water_demand: parseFloat(c.waterDemandM3 ?? c.waterDemand ?? c.water_demand ?? 0),
-      parent_id: c.parentId || c.parent_id
-    })),
-    t_max: form.tMax,
-    flow_ratio_min: form.flowRatioMin,
-    flow_ratio_max: form.flowRatioMax,
-    min_groups: form.minGroups,
-    max_groups: form.maxGroups,
-    pop_size: form.popSize,
-    n_gen: form.nGen,
-    seed: form.seed,
-    permeability_index_m: form.permeabilityIndexM,
-    permeability_coefficient_a: form.permeabilityCoefficientA,
-    pref_weight_time: form.prefWeightTime,
-    pref_weight_loss: form.prefWeightLoss,
-    pref_weight_flow_var: form.prefWeightFlowVar,
-    alpha: form.alpha
-  }
-
-  try {
     const data = await runFullOptimize(payload, form.apiKey.trim())
     if (requestToken !== renderToken) return
     result.value = data
     proxy.$modal.msgSuccess('优化完成')
-    // 持久化到 sessionStorage 供渠系水动力页"从优化结果导入"使用
-    try {
-      const snapshot = {
-        savedAt: new Date().toISOString(),
-        main_canal_id: form.mainCanalId.trim(),
-        summary: data?.summary || null,
-        branches: data?.branches || [],
-        laterals: data?.laterals || [],
-        main_canal: data?.main_canal || null,
-        topsis_summary: data?.topsis_summary || null
-      }
-      sessionStorage.setItem('canal_optimize_result', JSON.stringify(snapshot))
-    } catch (_) { /* storage may be disabled, ignore */ }
     await nextTick()
     renderAllCharts()
   } catch (err) {
@@ -929,8 +1106,10 @@ function renderFullGantt() {
 
   const rows = []
   // 干渠
-  rows.push({ name: '干渠 G' + (result.value.summary.main_canal_id || ''), isMain: true,
-    t_start: 0, duration: mainData.t_max_h || mainData.duration_h || 0 })
+  rows.push({
+    name: '干渠 G' + (result.value.summary.main_canal_id || ''), isMain: true,
+    t_start: 0, duration: mainData.t_max_h || mainData.duration_h || 0
+  })
   // 支渠
   branches.forEach(b => {
     rows.push({
@@ -1322,6 +1501,48 @@ onUnmounted(() => {
   align-items: stretch;
 }
 
+.db-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.muted-text {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.divider-soft {
+  height: 1px;
+  margin: 6px 0 14px;
+  background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.25), transparent);
+}
+
+.subtree-preview {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(14, 165, 233, 0.06);
+  border: 1px solid rgba(14, 165, 233, 0.15);
+}
+
+.subtree-preview__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.subtree-preview__levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mr6 {
+  margin-right: 6px;
+}
+
 .config-col {
   display: flex;
   min-width: 0;
@@ -1483,7 +1704,7 @@ onUnmounted(() => {
   margin-top: 16px;
 }
 
-.chart-row + .chart-row {
+.chart-row+.chart-row {
   margin-top: 16px;
 }
 
@@ -1514,12 +1735,29 @@ onUnmounted(() => {
   opacity: 0.9;
 }
 
-.kpi-card--primary::before { background: linear-gradient(90deg, #5b8def, #6366f1); }
-.kpi-card--danger::before { background: linear-gradient(90deg, #ef4444, #f97316); }
-.kpi-card--warning::before { background: linear-gradient(90deg, #f59e0b, #facc15); }
-.kpi-card--success::before { background: linear-gradient(90deg, #22c55e, #14b8a6); }
-.kpi-card--info::before { background: linear-gradient(90deg, #06b6d4, #0ea5e9); }
-.kpi-card--purple::before { background: linear-gradient(90deg, #a855f7, #ec4899); }
+.kpi-card--primary::before {
+  background: linear-gradient(90deg, #5b8def, #6366f1);
+}
+
+.kpi-card--danger::before {
+  background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+.kpi-card--warning::before {
+  background: linear-gradient(90deg, #f59e0b, #facc15);
+}
+
+.kpi-card--success::before {
+  background: linear-gradient(90deg, #22c55e, #14b8a6);
+}
+
+.kpi-card--info::before {
+  background: linear-gradient(90deg, #06b6d4, #0ea5e9);
+}
+
+.kpi-card--purple::before {
+  background: linear-gradient(90deg, #a855f7, #ec4899);
+}
 
 .kpi-card:hover {
   transform: translateY(-2px);
@@ -1563,6 +1801,7 @@ onUnmounted(() => {
   .chart {
     height: 300px;
   }
+
   .chart-tall {
     height: 380px;
   }
@@ -1572,6 +1811,7 @@ onUnmounted(() => {
   .config-col {
     display: block;
   }
+
   .config-body {
     max-height: none;
     overflow: visible;
@@ -1582,9 +1822,11 @@ onUnmounted(() => {
   .kpi-value {
     font-size: 22px;
   }
+
   .chart {
     height: 280px;
   }
+
   .chart-tall {
     height: 340px;
   }

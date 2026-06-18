@@ -21,8 +21,9 @@
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from pymoo.algorithms.moo.nsga2 import NSGA2
@@ -36,6 +37,35 @@ from pymoo.optimize import minimize
 from module_irrigation.model.canals_data import CanalRecord
 
 GRAVITY: float = 9.81
+
+# tqdm 在 Windows + asyncio.to_thread / 非交互终端的上下文里 sys.stderr 不可 seek，
+# 会导致 OSError: [Errno 22] Invalid argument；统一在此关闭进度条。
+_disable_tqdm: bool = not sys.stderr.isatty()
+
+
+# =============================================================================
+# JSON 序列化兜底：把 inf / NaN 替换为 None，避免 "Out of range float values"
+# =============================================================================
+
+
+def _sanitize(obj: Any) -> Any:
+    """递归替换 dict / list / float 中的 inf / NaN 为 None。
+
+    用途：pymoo NSGA-II 在极端约束下可能产出 inf / NaN 的目标值，
+    后续 json.dumps 失败时整个接口 500，这里做兜底。
+    """
+    import math as _math
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    if isinstance(obj, tuple):
+        return [_sanitize(v) for v in obj]
+    if isinstance(obj, float):
+        if _math.isnan(obj) or _math.isinf(obj):
+            return None
+        return obj
+    return obj
 
 
 # =============================================================================
@@ -52,8 +82,13 @@ def _entropy_topsis_weighted(
     F_norm = (F_matrix - F_matrix.min(axis=0)) / (
         F_matrix.max(axis=0) - F_matrix.min(axis=0) + 1e-9
     )
-    P = F_norm / np.sum(F_norm, axis=0)
-    E = -np.sum(P * np.log(P + 1e-9), axis=0) / np.log(len(F_norm))
+    col_sum = np.sum(F_norm, axis=0)
+    # 列常量或全零时回落到均匀分布, 避免 0/0 -> NaN
+    safe_sum = np.where(col_sum > 1e-12, col_sum, 1.0)
+    P = F_norm / safe_sum
+    # 列常量时熵退化为 ln(n) -> E=1 -> W_entropy=0, 退化为等权
+    E_raw = -np.sum(P * np.log(P + 1e-9), axis=0) / np.log(len(F_norm))
+    E = np.where(np.isfinite(E_raw), E_raw, 1.0)
     W_entropy = (1 - E) / np.sum(1 - E)
     W = alpha * pref_weights + (1 - alpha) * W_entropy
 
@@ -63,6 +98,7 @@ def _entropy_topsis_weighted(
             axis=1,
         )
     )
+    distances = np.nan_to_num(distances, nan=0.0, posinf=0.0, neginf=0.0)
     best_index = int(np.argmax(distances))
     return distances, W, best_index
 
@@ -112,9 +148,9 @@ def _trapezoid_Qmax(canal: CanalRecord) -> float:
 class FullCanalContext:
     """全渠系优化上下文。"""
 
-    main: CanalRecord  # 干渠
-    branches: list[CanalRecord]  # 支渠列表
-    laterals_by_branch: dict[str, list[CanalRecord]]  # 每个支渠下的斗渠
+    main: CanalRecord  # 上层（干/支/斗，依 start_level 而定）
+    branches: list[CanalRecord]  # 中层渠道列表
+    laterals_by_branch: dict[str, list[CanalRecord]]  # 每个中层渠道下的下层渠道
     t_max: float = 360.0
     flow_ratio_min: float = 0.8
     flow_ratio_max: float = 1.0
@@ -129,6 +165,10 @@ class FullCanalContext:
     pref_weight_loss: float = 0.3
     pref_weight_flow_var: float = 0.3
     alpha: float = 0.5
+    # 通用级别方案：连续 3 级的实际编号（默认 1-2-3）
+    upper_level: int = 1
+    middle_level: int = 2
+    lower_level: int = 3
 
 
 @dataclass
@@ -158,14 +198,14 @@ class FullResult:
 
     def to_dict(self) -> dict:
         return {
-            'summary': self.summary,
-            'main_canal': self.main_canal,
-            'branches': self.branches,
-            'laterals': self.laterals,
-            'groups': self.groups,
-            'time_series': self.time_series,
-            'pareto': self.pareto,
-            'topsis_summary': self.topsis_summary,
+            'summary': _sanitize(self.summary),
+            'main_canal': _sanitize(self.main_canal),
+            'branches': _sanitize(self.branches),
+            'laterals': _sanitize(self.laterals),
+            'groups': _sanitize(self.groups),
+            'time_series': _sanitize(self.time_series),
+            'pareto': _sanitize(self.pareto),
+            'topsis_summary': _sanitize(self.topsis_summary),
         }
 
 
@@ -197,10 +237,19 @@ class FullCanalProblem(ElementwiseProblem):
         self.K = K
         qd_list = np.array([b.design_flow for b in ctx.branches])
         self.qd_list = qd_list
+        # 节点级流量守恒约束：父渠段（默认即干渠）在多个采样时刻 t 上的
+        # "子渠段入流之和 ≤ 父渠段设计流量"。T 个采样点 → T 条不等式。
+        # 仅当存在子渠段时才有意义；空 K 走单约束兜底。
+        t_max = float(ctx.t_max)
+        if K > 0 and t_max > 0:
+            self.t_samples = np.linspace(0.0, t_max, 24)
+        else:
+            self.t_samples = np.array([0.0])
+        n_node = len(self.t_samples) if K > 0 else 0
         super().__init__(
             n_var=K * 2,
             n_obj=3,
-            n_ieq_constr=1,
+            n_ieq_constr=1 + n_node,
             xl=np.concatenate([0.6 * qd_list, np.zeros(K)]),
             xu=np.concatenate([qd_list, np.full(K, ctx.t_max)]),
         )
@@ -247,12 +296,23 @@ class FullCanalProblem(ElementwiseProblem):
             )
             F2 += branch_loss
 
-        # 约束：干渠最大流量
+        # 约束1：干渠最大流量（渠槽水力上限）
         Qmax_main = _trapezoid_Qmax(ctx.main)
         g1 = float(np.max(Qt) - Qmax_main) if len(Qt) > 0 else 0.0
 
+        # 约束2+：节点级流量守恒
+        # 在每个采样时刻 t，校验 sum(在配水的支渠流量) ≤ 父渠段（干渠）设计流量
+        # 这是"任意时刻下级渠道流量总和不能大于干渠配水流量"的硬约束
+        g_node_list: list[float] = []
+        if K > 0:
+            Qd_parent = float(ctx.main.design_flow)
+            for t_s in self.t_samples:
+                active = (tsk <= t_s) & (tek >= t_s)
+                sum_child = float(np.sum(qk[active]))
+                g_node_list.append(sum_child - Qd_parent)
+
         out['F'] = [F1, F2, F3]
-        out['G'] = [g1]
+        out['G'] = [g1, *g_node_list]
 
 
 # =============================================================================
@@ -412,6 +472,7 @@ def _ProgressCallback(n_gen, ctx: FullCanalContext):
                 unit='代',
                 leave=False,
                 dynamic_ncols=True,
+                disable=_disable_tqdm,
             )
             self.last_report = 0
 
@@ -453,7 +514,15 @@ def solve_full_optimization(ctx: FullCanalContext) -> FullResult:
     4. TOPSIS 选优：从 Pareto 前沿选择最优方案
     """
     if not ctx.branches:
-        raise ValueError('branches 列表为空，无法运行全渠系优化')
+        raise ValueError(
+            f'branches 列表为空，无法运行全渠系优化（根={ctx.main.canal_id}，'
+            f'该渠段下未找到任何 level={ctx.middle_level} 的中层渠道）'
+        )
+    if not ctx.laterals_by_branch:
+        raise ValueError(
+            f'laterals_by_branch 为空，根={ctx.main.canal_id} 下所有中层渠道均无下层渠道（level={ctx.lower_level}），'
+            f'请检查 start_level 与实际渠系层级的对应关系'
+        )
 
     # 步骤1：干-支优化（NSGA-II）
     problem = FullCanalProblem(ctx)
@@ -513,6 +582,7 @@ def solve_full_optimization(ctx: FullCanalContext) -> FullResult:
         unit='支',
         leave=False,
         dynamic_ncols=True,
+        disable=_disable_tqdm,
     )
 
     for i, branch in enumerate(ctx.branches):
