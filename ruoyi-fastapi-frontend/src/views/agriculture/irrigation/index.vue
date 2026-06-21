@@ -12,7 +12,7 @@
             <el-icon><Promotion /></el-icon>
             <span>渠系配水优化</span>
           </router-link>
-          <router-link to="/model/canal/hydro" class="sibling-link">
+          <router-link to="/model/canal/kinematic" class="sibling-link">
             <el-icon><Promotion /></el-icon>
             <span>渠系水动力学</span>
           </router-link>

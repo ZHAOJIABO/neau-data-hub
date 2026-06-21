@@ -4,16 +4,9 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
-
-
-class InflowSeriesPointModel(BaseModel):
-    """入流时序点。"""
-
-    time_min: float = Field(ge=0, description='时间 (min)')
-    q_m3s: float = Field(ge=0, description='入流流量 (m3/s)')
 
 
 class CanalInputModel(BaseModel):
@@ -30,7 +23,7 @@ class CanalInputModel(BaseModel):
     design_depth: float = Field(default=0.0, ge=0, description='设计水深 (m)')
     top_width: float = Field(default=0.0, ge=0, description='设计渠顶宽 (m)')
     bottom_width: float = Field(default=0.0, ge=0, description='设计渠底宽 (m)')
-    slope: float = Field(default=0.0, ge=0, description='设计纵坡')
+    slope: float = Field(default=0.0, ge=0, description='坡降')
     side_slope: float = Field(default=0.0, ge=0, description='边坡系数 (1:m)')
     roughness: float = Field(default=0.0, ge=0, description='糙率 Manning n')
     gate_height: float = Field(default=0.0, ge=0, description='闸门高度 (m)')
@@ -38,10 +31,6 @@ class CanalInputModel(BaseModel):
     min_gate_opening: float = Field(default=0.0, ge=0, description='闸门最小开度 (m)')
     max_gate_opening: float = Field(default=0.0, ge=0, description='闸门最大开度 (m)')
     water_demand: float = Field(default=0.0, ge=0, description='单次配水需水量 (m³)')
-    inflow_series: Optional[List[InflowSeriesPointModel]] = Field(
-        default=None,
-        description='该渠段上游入流时序 (time_min, q_m3s)；未传时按恒定设计流量入流',
-    )
 
 
 class CanalTopologyItemModel(BaseModel):
@@ -87,19 +76,78 @@ class FullOptimizeStandardRequest(BaseModel):
     alpha: float = Field(default=0.5, ge=0, le=1, description='先验权重与熵权混合系数')
 
 
-class SubtreeHydroRequest(BaseModel):
-    """两级渠段（父+子）逐分钟水动力学仿真标准 JSON 请求。
+# =============================================================================
+# 干支优化 / 支斗轮续灌 请求模型
+# =============================================================================
 
-    前端选择某条父渠道，将该父渠道及其直接下级子渠道作为"两级"传入；
-    后端只仿真这两级，不做更深层 BFS。
-    - 父渠道（root）：`parent_id` 为 None 或缺省
-    - 子渠道：`parent_id == root.canal_id`
-    - 下级未传 `inflow_series` 时，按其 `design_flow` 恒定入流
+
+class TrunkBranchOptimizeRequest(BaseModel):
+    """干支优化请求：选一条 level-2 干渠 + 其所有 level-3 支渠子网。
+
+    算法参考「干支优化配水.py」：NSGA-II 三目标（总输水时间 / 输水损失 / 干渠流量波动），
+    决策变量为支渠流量和开始时间，约束为干渠最大流量（水力学 Manning 公式）。
     """
 
+    mode: Literal["trunk-branch"] = "trunk-branch"
     canals: List[CanalInputModel] = Field(
-        description='两级渠段数据（1 父 + ≥1 子），每条至少给 length/design_flow/底宽/边坡/纵坡/糙率',
+        description='完整渠段列表（level-2 干渠 + level-3 支渠），由前端根据选择主动收集',
     )
-    sim_duration_min: int = Field(default=60, ge=1, le=1440, description='仿真时长 (min)，最大 24h')
-    dt_sec: int = Field(default=30, ge=30, le=60, description='时间步长 (s)')
-    dx_m: float = Field(default=50.0, gt=0, description='空间步长参考值 (m)')
+    topology: Optional[List[CanalTopologyItemModel]] = Field(
+        default=None,
+        description='可选显式父子拓扑',
+    )
+    trunk_canal_id: str = Field(
+        description='参与优化的干渠 canal_id（level-2），必须存在于 canals 中',
+    )
+    t_max: float = Field(default=360.0, gt=0, description='总输水时间上限 (h)')
+    flow_ratio_min: float = Field(
+        default=0.6, gt=0,
+        description='支渠配水流量/设计流量下限（0.6~1.0 区间内）',
+    )
+    flow_ratio_max: float = Field(default=1.0, gt=0, description='支渠配水流量/设计流量上限')
+    pop_size: int = Field(default=120, ge=10, description='NSGA-II 种群规模')
+    n_gen: int = Field(default=120, ge=1, description='NSGA-II 迭代代数')
+    seed: int = Field(default=1, ge=0, description='随机种子')
+    permeability_index: float = Field(default=0.4, ge=0, description='渠床土壤透水指数 m')
+    permeability_coefficient: float = Field(default=1.9, ge=0, description='渠床土壤透水系数 A')
+    pref_weight_time: float = Field(default=0.7, ge=0, description='先验权重：总输水时间')
+    pref_weight_loss: float = Field(default=0.1, ge=0, description='先验权重：全渠系渗漏损失')
+    pref_weight_flow_var: float = Field(default=0.2, ge=0, description='先验权重：干渠流量波动')
+    alpha: float = Field(default=0.5, ge=0, le=1, description='先验权重与熵权混合系数')
+
+
+class BranchLateralOptimizeRequest(BaseModel):
+    """支斗轮续灌优化请求：选一条 level-3 支渠 + 其所有 level-4 斗渠子网。
+
+    算法参考「支斗优化配水.py」：NSGA-II 三目标（总输水损失 / 组间流量差异 / 组内时间差异），
+    决策变量为斗渠分组编号和流量比例，对斗渠进行组间轮灌组内续灌优化。
+    """
+
+    mode: Literal["branch-lateral"] = "branch-lateral"
+    canals: List[CanalInputModel] = Field(
+        description='完整渠段列表（level-3 支渠 + level-4 斗渠），由前端根据选择主动收集',
+    )
+    topology: Optional[List[CanalTopologyItemModel]] = Field(
+        default=None,
+        description='可选显式父子拓扑',
+    )
+    branch_canal_id: str = Field(
+        description='参与优化的支渠 canal_id（level-3），必须存在于 canals 中',
+    )
+    t_max: float = Field(default=360.0, gt=0, description='总输水时间上限 (h)')
+    flow_ratio_min: float = Field(
+        default=0.6, gt=0,
+        description='斗渠配水流量/设计流量下限（0.6~1.0 区间内）',
+    )
+    flow_ratio_max: float = Field(default=1.0, gt=0, description='斗渠配水流量/设计流量上限')
+    min_groups: int = Field(default=2, ge=2, description='轮灌候选最小分组数')
+    max_groups: int = Field(default=6, ge=2, description='轮灌候选最大分组数')
+    pop_size: int = Field(default=150, ge=10, description='NSGA-II 种群规模')
+    n_gen: int = Field(default=100, ge=1, description='NSGA-II 迭代代数')
+    seed: int = Field(default=1, ge=0, description='随机种子')
+    permeability_index: float = Field(default=0.4, ge=0, description='渠床土壤透水指数 m')
+    permeability_coefficient: float = Field(default=1.9, ge=0, description='渠床土壤透水系数 A')
+    pref_weight_time: float = Field(default=0.4, ge=0, description='先验权重：总输水时间')
+    pref_weight_loss: float = Field(default=0.3, ge=0, description='先验权重：全渠系渗漏损失')
+    pref_weight_flow_var: float = Field(default=0.3, ge=0, description='先验权重：干渠流量波动')
+    alpha: float = Field(default=0.5, ge=0, le=1, description='先验权重与熵权混合系数')

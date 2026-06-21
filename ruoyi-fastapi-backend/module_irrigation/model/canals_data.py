@@ -1,12 +1,15 @@
 """
 渠系数据加载与单例管理。
 
-数据来源：PostgreSQL 表 `agri_canal_v2`（见 `module_agriculture.entity.do.canal_do.CanalBase`）。
-`CanalsData` 仍保留为内存单例，给 `module_irrigation.model.canal_models` 中的求解函数做只读快照。
+数据来源：PostgreSQL 表 `agri_canal`（见 `module_agriculture.entity.do.canal_do.CanalBase`）。
+`CanalsData` 保留为内存单例，给 `module_irrigation.model.canal_models` 中的求解函数做只读快照。
 
-全灌区共享的常量（渠床土壤透水指数/系数、闸门流量系数 μ、淹没系数 σs、侧收缩系数 ε）
-由调用方在调用灌溉求解接口时作为参数传入；重力加速度 g 在 `canal_models.GRAVITY` 中以常量形式给出。
-`parse_canal_row` 解析用户上传的 CSV 行，列名兼容旧版（包含上述全局列），但解析后**丢弃**这些列。
+CSV 格式（canal.csv）：
+  canal_id, canal_name, parent_id, level, length, design_flow,
+  bottom_width, slope, side_slope, roughness, water_demand,
+  position, latitude, longitude
+
+`CanalRecord` 保留 design_depth / gate_* 等字段，由调用方根据需要补充或设为默认值 0.0。
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from typing import Any, ClassVar, Iterable
 
 def parse_canal_value(value: Any, default: float = 0.0) -> float:
     """
-    解析 CSV / DB 中的字符串数字，支持 "1/5000" 形式的纵坡。
+    解析 CSV / DB 中的字符串数字，支持 "1/5000" 形式的坡降。
     """
     if value is None:
         return default
@@ -35,32 +38,26 @@ def parse_canal_value(value: Any, default: float = 0.0) -> float:
 
 def parse_canal_row(row: dict[str, Any]) -> dict[str, Any] | None:
     """
-    把 CSV 字典行解析为渠段字段字典；返回 None 表示该行无效。
+    解析 canal.csv 字典行，返回渠段字段字典。
 
-    返回字典字段对齐 `CanalBase`（除 `id` / `created_at` / `updated_at`）。
-    旧版 CSV 含全灌区共享的常量列（透水指数/系数、g、μ、σs、ε），此处**忽略**这些列：
-    它们不再入库。
+    返回字典字段与 agri_canal 表对齐。
     """
-    canal_id = (row.get('Channel No.') or '').strip()
+    canal_id = (row.get('canal_id') or '').strip()
     if not canal_id:
         return None
     return {
         'canal_id': canal_id,
-        'canal_name': (row.get('Channel Name') or '').strip() or None,
-        'level': (row.get('Channel Level') or '').strip() or None,
-        'length': parse_canal_value(row.get('Length(m)')),
-        'design_flow': parse_canal_value(row.get('Design Flow(m³/s)')),
-        'design_depth': parse_canal_value(row.get('Design Depth(m)')),
-        'top_width': parse_canal_value(row.get('Design Top Width(m)')),
-        'bottom_width': parse_canal_value(row.get('Design Bottom Width(m)')),
-        'slope': parse_canal_value(row.get('Design Slope'), 1e-4),
-        'side_slope': parse_canal_value(row.get('Design Side Slope(1:m)'), 1.5),
-        'roughness': parse_canal_value(row.get('Channel Roughness'), 0.015),
-        'gate_height': parse_canal_value(row.get('Gate Height(m)')),
-        'gate_width': parse_canal_value(row.get('Gate Width(m)')),
-        'min_gate_opening': parse_canal_value(row.get('Min Gate Opening(m)')),
-        'max_gate_opening': parse_canal_value(row.get('Max Gate Opening(m)'), 1.0),
-        'water_demand': parse_canal_value(row.get('Water Demand(m³)')),
+        'canal_name': (row.get('canal_name') or '').strip() or None,
+        'parent_id': (row.get('parent_id') or '').strip() or None,
+        'level': (row.get('level') or '').strip() or None,
+        'length': parse_canal_value(row.get('length')),
+        'design_flow': parse_canal_value(row.get('design_flow')),
+        'bottom_width': parse_canal_value(row.get('bottom_width')),
+        'slope': parse_canal_value(row.get('slope')),
+        'side_slope': parse_canal_value(row.get('side_slope')),
+        'roughness': parse_canal_value(row.get('roughness')),
+        'water_demand': parse_canal_value(row.get('water_demand')),
+        'position': parse_canal_value(row.get('position')),
     }
 
 

@@ -1,0 +1,33 @@
+{
+  "_schema_version": "1.0.0",
+  "_description": "Matches SPEC.md: 5000 m trapezoidal channel, Q_in=15 m3/s, 5 branch offtakes summing to 15 m3/s",
+
+  "channel": {
+    "L":           5000.0,
+    "nx":          51,
+    "b":           5.0,
+    "m":           1.5,
+    "n_Manning":   0.025,
+    "S0":          0.0003,
+    "Q_upstream":  15.0,
+    "Q_initial":   10.0,
+    "tf":          3600.0,
+    "dt":          30.0,
+    "g":           9.81,
+    "tolerance":   1e-6
+  },
+
+  "solver": {
+    "theta":          0.5,
+    "tolerance":      1e-6,
+    "max_iterations": 100
+  },
+
+  "branches": [
+    { "x_position": 1000.0, "Q_offtake": 3.0, "spread_cells": 2 },
+    { "x_position": 2000.0, "Q_offtake": 3.0, "spread_cells": 2 },
+    { "x_position": 3000.0, "Q_offtake": 3.0, "spread_cells": 2 },
+    { "x_position": 4000.0, "Q_offtake": 3.0, "spread_cells": 2 },
+    { "x_position": 5000.0, "Q_offtake": 3.0, "spread_cells": 2 }
+  ]
+}

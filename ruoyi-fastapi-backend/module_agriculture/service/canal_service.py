@@ -32,7 +32,6 @@ _TOPOLOGY_FIELDS = (
     'level',
     'length',
     'design_flow',
-    'design_depth',
     'water_demand',
 )
 
@@ -152,9 +151,7 @@ class CanalService:
                 'level': rec.level,
                 'length': float(rec.length or 0),
                 'design_flow': float(rec.design_flow or 0),
-                'design_depth': float(rec.design_depth or 0),
                 'water_demand': float(rec.water_demand or 0),
-                'has_gate': (rec.gate_height or 0) > 0 and (rec.gate_width or 0) > 0,
             }
             nodes.append(node)
 
@@ -193,17 +190,12 @@ class CanalService:
                     'level': rec.level or '',
                     'length': float(rec.length or 0.0),
                     'design_flow': float(rec.design_flow or 0.0),
-                    'design_depth': float(rec.design_depth or 0.0),
-                    'top_width': float(rec.top_width or 0.0),
                     'bottom_width': float(rec.bottom_width or 0.0),
                     'slope': float(rec.slope or 0.0),
                     'side_slope': float(rec.side_slope or 0.0),
                     'roughness': float(rec.roughness or 0.0),
-                    'gate_height': float(rec.gate_height or 0.0),
-                    'gate_width': float(rec.gate_width or 0.0),
-                    'min_gate_opening': float(rec.min_gate_opening or 0.0),
-                    'max_gate_opening': float(rec.max_gate_opening or 0.0),
                     'water_demand': float(rec.water_demand or 0.0),
+                    'position': float(rec.position or 0.0),
                 }
             )
         return result

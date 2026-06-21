@@ -241,18 +241,18 @@
           </div>
         </router-link>
 
-        <router-link to="/model/canal/hydro" class="model-card">
+        <router-link to="/model/canal/kinematic" class="model-card">
           <div class="model-card-icon hydro-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
           </div>
           <h3>渠系水动力学模拟</h3>
-          <p>基于圣维南方程的明渠非恒定流高精度仿真，干支渠耦合联动计算</p>
+          <p>基于 Kinematic Wave 隐式迎风有限差分法，Manning 摩阻 + Thomas 追赶法，返回时空水位流量序列</p>
           <div class="model-tags">
-            <span>圣维南方程</span>
-            <span>有限差分</span>
-            <span>耦合仿真</span>
+            <span>Kinematic Wave</span>
+            <span>Thomas 追赶法</span>
+            <span>非恒定流</span>
           </div>
         </router-link>
 

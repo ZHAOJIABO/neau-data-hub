@@ -5,28 +5,24 @@
         <span class="agri-page__eyebrow canal-optimize-eyebrow">NSGA-II OPTIMIZATION</span>
         <h1 class="agri-page__title">渠系优化配水</h1>
         <p class="agri-page__desc">
-          基于 NSGA-II 多目标进化算法的全渠系三级顺序配水优化：先进行干-支连续配水优化，
-          再对每个支渠下的斗渠进行组间轮灌组内续灌优化。前端从渠系管理接口获取渠段数据后
-          提交后端计算，结果以结构化 JSON 返回，ECharts 动态渲染所有图表。
+          基于 NSGA-II 多目标进化算法的渠系分级优化：<strong>干支优化</strong>对干-支渠道进行连续配水，
+          <strong>支斗轮续灌优化</strong>对支-斗渠道进行组间轮灌组内续灌。选择渠段后提交后端计算，
+          ECharts 动态渲染所有图表。
         </p>
         <div class="agri-page__siblings">
           <router-link to="/model/irrigation" class="sibling-link">
-            <el-icon>
-              <Promotion />
-            </el-icon>
+            <el-icon><Promotion /></el-icon>
             <span>灌溉决策</span>
           </router-link>
-          <router-link to="/model/canal/hydro" class="sibling-link">
-            <el-icon>
-              <Promotion />
-            </el-icon>
+          <router-link to="/model/canal/kinematic" class="sibling-link">
+            <el-icon><Promotion /></el-icon>
             <span>渠系水动力学</span>
           </router-link>
         </div>
       </div>
       <div class="agri-page__tags">
         <span class="canal-optimize-tag">NSGA-II</span>
-        <span class="canal-optimize-tag canal-optimize-tag--pink">前端选根渠段</span>
+        <span class="canal-optimize-tag canal-optimize-tag--pink">干支 / 支斗 分级</span>
         <span class="canal-optimize-tag canal-optimize-tag--indigo">ECharts 动态</span>
       </div>
       <div class="hero-decor" aria-hidden="true">
@@ -37,32 +33,39 @@
     </section>
 
     <el-row :gutter="20" class="page-layout">
-      <!-- 左侧：参数配置 -->
+      <!-- ============ 左侧：参数配置 ============ -->
       <el-col :xs="24" :lg="8" class="config-col">
         <el-card shadow="hover" class="config-card glass-card result-card">
           <template #header>
             <div class="card-header">
               <div>
-                <div class="card-title">渠系优化配水（NSGA-II）</div>
-                <div class="card-desc">加载渠系数据并选择根渠段，自动收集下游三级渠道提交后端计算。</div>
+                <div class="card-title">渠系优化配水</div>
+                <div class="card-desc">加载渠系数据并选择目标渠段，提交后端分级优化计算。</div>
               </div>
-              <el-tag :type="resultError ? 'danger' : result ? 'success' : 'info'">
-                {{ resultError ? '接口异常' : result ? '方案已生成' : '待提交' }}
+              <el-tag :type="resultError ? 'danger' : activeResult ? 'success' : 'info'">
+                {{ resultError ? '接口异常' : activeResult ? '方案已生成' : '待提交' }}
               </el-tag>
             </div>
+            <!-- Tab 切换 -->
+            <el-tabs v-model="activeTab" class="mode-tabs mt8" @tab-change="onTabChange">
+              <el-tab-pane label="干支优化" name="trunk-branch" />
+              <el-tab-pane label="支斗轮续灌" name="branch-lateral" />
+            </el-tabs>
           </template>
 
           <div class="config-body">
-            <el-alert type="info" :closable="false" show-icon title="算法超参默认（POP=80, GEN=60）保证秒级响应；如需更高精度可调大 pop/n_gen。"
-              class="mb16" />
+            <el-alert type="info" :closable="false" show-icon
+              title="算法超参默认（POP=80, GEN=60）保证秒级响应；如需更高精度可调大 pop/n_gen。"
+              class="mb12" />
 
             <el-form ref="formRef" :model="form" label-position="top" size="small" class="opt-form">
+              <!-- 通用：接口 API Key -->
               <el-form-item label="接口 API Key" required>
                 <el-input v-model="form.apiKey" type="password" show-password clearable
                   placeholder="X-Irrigation-Api-Key" />
               </el-form-item>
 
-              <!-- 加载数据 -->
+              <!-- 通用：加载数据 -->
               <div class="db-row mb12">
                 <el-button size="small" type="primary" plain @click="loadFromDb" :loading="loadingDb">
                   加载渠系数据
@@ -70,147 +73,255 @@
                 <span class="muted-text">已加载 {{ dbCanals.length }} 条</span>
               </div>
 
-              <!-- 根渠段选择 -->
-              <el-form-item label="选择根渠段" required>
-                <el-select v-model="form.rootCanalId" placeholder="请先加载渠系数据，再选择根渠段" filterable clearable
-                  style="width: 100%" :disabled="dbCanals.length === 0" @change="onRootChange">
-                  <el-option v-for="c in dbCanals" :key="c.canal_id"
-                    :label="`${c.canal_id}${c.canal_name ? ' · ' + c.canal_name : ''} (L${c.level || '?'})`"
-                    :value="c.canal_id" />
-                </el-select>
-              </el-form-item>
+              <!-- ============ 干支 Tab ============ -->
+              <template v-if="activeTab === 'trunk-branch'">
+                <el-form-item label="选择干渠（level-2）" required>
+                  <el-select v-model="form.trunkCanalId" placeholder="请选择一条干渠" filterable clearable
+                    style="width: 100%" :disabled="dbCanals.length === 0" @change="onTrunkChange">
+                    <el-option v-for="c in trunkCanals" :key="c.canal_id"
+                      :label="`${c.canal_id}${c.canal_name ? ' · ' + c.canal_name : ''} (L${c.level})`"
+                      :value="c.canal_id" />
+                  </el-select>
+                </el-form-item>
 
-              <!-- 自动显示将传入的子树预览 -->
-              <div v-if="collectedSubtree" class="subtree-preview mb12">
-                <div class="subtree-preview__label">
-                  将传入 {{ collectedSubtree.canals.length }} 条渠道（3级）：
+                <div v-if="trunkPreview" class="subtree-preview mb12">
+                  <div class="subtree-preview__label">
+                    将传入 {{ trunkPreview.stats.n_trunk + trunkPreview.stats.n_branch }} 条渠道：
+                  </div>
+                  <div class="subtree-preview__levels">
+                    <el-tag size="small" class="mr6" type="info">
+                      干 L2: {{ trunkPreview.stats.n_trunk }}条
+                    </el-tag>
+                    <el-tag size="small" type="success">
+                      支 L3: {{ trunkPreview.stats.n_branch }}条
+                    </el-tag>
+                  </div>
                 </div>
-                <div class="subtree-preview__levels">
-                  <el-tag size="small" class="mr6" type="info">
-                    干 {{ collectedSubtree.stats.level_upper }}级: {{ collectedSubtree.stats.n_upper }}条
-                  </el-tag>
-                  <el-tag size="small" class="mr6" type="success">
-                    支 {{ collectedSubtree.stats.level_middle }}级: {{ collectedSubtree.stats.n_middle }}条
-                  </el-tag>
-                  <el-tag size="small" type="warning">
-                    斗 {{ collectedSubtree.stats.level_lower }}级: {{ collectedSubtree.stats.n_lower }}条
-                  </el-tag>
+
+                <div class="divider-soft" />
+
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="t_max (h)">
+                      <el-input-number v-model="form.tb_tMax" :min="1" :max="2000" :step="1" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="q/qd 下限">
+                      <el-input-number v-model="form.tb_flowRatioMin" :min="0.1" :max="1" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="q/qd 上限">
+                      <el-input-number v-model="form.tb_flowRatioMax" :min="0.1" :max="1.5" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-divider content-position="left">NSGA-II 超参</el-divider>
+
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="种群 pop">
+                      <el-input-number v-model="form.tb_popSize" :min="10" :max="600" :step="10" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="迭代 n_gen">
+                      <el-input-number v-model="form.tb_nGen" :min="10" :max="2000" :step="50" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-form-item label="随机种子">
+                  <el-input-number v-model="form.tb_seed" :min="0" :max="999" :step="1" style="width: 100%" />
+                </el-form-item>
+
+                <el-divider content-position="left">土壤参数</el-divider>
+
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="渗透指数 m">
+                      <el-input-number v-model="form.tb_permIndexM" :min="0" :step="0.05" :precision="3"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="渗透系数 A">
+                      <el-input-number v-model="form.tb_permCoefA" :min="0" :step="0.1" :precision="3"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-divider content-position="left">目标权重（时间优先）</el-divider>
+
+                <el-row :gutter="12">
+                  <el-col :span="8">
+                    <el-form-item label="w_时间">
+                      <el-input-number v-model="form.tb_prefTime" :min="0" :max="1" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-form-item label="w_损失">
+                      <el-input-number v-model="form.tb_prefLoss" :min="0" :max="1" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-form-item label="w_波动">
+                      <el-input-number v-model="form.tb_prefFlowVar" :min="0" :max="1" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+
+                <el-form-item label="混合系数 α">
+                  <el-input-number v-model="form.tb_alpha" :min="0" :max="1" :step="0.05" :precision="2"
+                    style="width: 100%" />
+                </el-form-item>
+              </template>
+
+              <!-- ============ 支斗 Tab ============ -->
+              <template v-else>
+                <el-form-item label="选择支渠（level-3）" required>
+                  <el-select v-model="form.branchCanalId" placeholder="请选择一条支渠" filterable clearable
+                    style="width: 100%" :disabled="dbCanals.length === 0" @change="onBranchChange">
+                    <el-option v-for="c in branchCanals" :key="c.canal_id"
+                      :label="`${c.canal_id}${c.canal_name ? ' · ' + c.canal_name : ''} (L${c.level})`"
+                      :value="c.canal_id" />
+                  </el-select>
+                </el-form-item>
+
+                <div v-if="branchPreview" class="subtree-preview mb12">
+                  <div class="subtree-preview__label">
+                    将传入 {{ branchPreview.stats.n_branch + branchPreview.stats.n_lateral }} 条渠道：
+                  </div>
+                  <div class="subtree-preview__levels">
+                    <el-tag size="small" class="mr6" type="info">
+                      支 L3: {{ branchPreview.stats.n_branch }}条
+                    </el-tag>
+                    <el-tag size="small" type="warning">
+                      斗 L4: {{ branchPreview.stats.n_lateral }}条
+                    </el-tag>
+                  </div>
                 </div>
-              </div>
 
-              <div v-if="!form.rootCanalId && dbCanals.length > 0" class="mb12">
-                <el-alert type="warning" :closable="false" show-icon title="请在上方选择一条根渠段" />
-              </div>
+                <div class="divider-soft" />
 
-              <div class="divider-soft" />
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="t_max (h)">
+                      <el-input-number v-model="form.bl_tMax" :min="1" :max="2000" :step="1" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="最小组数">
+                      <el-input-number v-model="form.bl_minGroups" :min="2" :max="10" :step="1" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
 
-              <el-alert type="info" :closable="false" show-icon class="mb12">
-                根渠段级别自动推断为 start_level={{ inferredStartLevel }}，
-                参与区间 [{{ inferredStartLevel }}-{{ inferredStartLevel + 1 }}-{{ inferredStartLevel + 2 }}]。
-              </el-alert>
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="最大组数">
+                      <el-input-number v-model="form.bl_maxGroups" :min="2" :max="10" :step="1" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="q/qd 下限">
+                      <el-input-number v-model="form.bl_flowRatioMin" :min="0.1" :max="1" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
 
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="t_max (h)">
-                    <el-input-number v-model="form.tMax" :min="1" :max="2000" :step="1" style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="最大组数">
-                    <el-input-number v-model="form.maxGroups" :min="2" :max="6" :step="1" style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="q/qd 上限">
+                      <el-input-number v-model="form.bl_flowRatioMax" :min="0.1" :max="1.5" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
 
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="q/qd 下限">
-                    <el-input-number v-model="form.flowRatioMin" :min="0.1" :max="1" :step="0.05" :precision="2"
-                      style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="q/qd 上限">
-                    <el-input-number v-model="form.flowRatioMax" :min="0.1" :max="1.5" :step="0.05" :precision="2"
-                      style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
+                <el-divider content-position="left">NSGA-II 超参</el-divider>
 
-              <el-form-item label="最小组数">
-                <el-input-number v-model="form.minGroups" :min="2" :max="6" :step="1" style="width: 100%" />
-              </el-form-item>
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="种群 pop">
+                      <el-input-number v-model="form.bl_popSize" :min="10" :max="600" :step="10" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="迭代 n_gen">
+                      <el-input-number v-model="form.bl_nGen" :min="10" :max="2000" :step="50" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
 
-              <el-divider content-position="left">NSGA-II 超参</el-divider>
+                <el-form-item label="随机种子">
+                  <el-input-number v-model="form.bl_seed" :min="0" :max="999" :step="1" style="width: 100%" />
+                </el-form-item>
 
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="种群 pop">
-                    <el-input-number v-model="form.popSize" :min="10" :max="600" :step="10" style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="迭代 n_gen">
-                    <el-input-number v-model="form.nGen" :min="10" :max="2000" :step="50" style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
+                <el-divider content-position="left">土壤参数</el-divider>
 
-              <el-form-item label="随机种子">
-                <el-input-number v-model="form.seed" :min="0" :max="999" :step="1" style="width: 100%" />
-              </el-form-item>
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="渗透指数 m">
+                      <el-input-number v-model="form.bl_permIndexM" :min="0" :step="0.05" :precision="3"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="渗透系数 A">
+                      <el-input-number v-model="form.bl_permCoefA" :min="0" :step="0.1" :precision="3"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
 
-              <el-divider content-position="left">土壤参数</el-divider>
+                <el-divider content-position="left">目标权重</el-divider>
 
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="渗透指数 m">
-                    <el-input-number v-model="form.permeabilityIndexM" :min="0" :step="0.05" :precision="3"
-                      style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="渗透系数 A">
-                    <el-input-number v-model="form.permeabilityCoefficientA" :min="0" :step="0.1" :precision="3"
-                      style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
+                <el-row :gutter="12">
+                  <el-col :span="8">
+                    <el-form-item label="w_时间">
+                      <el-input-number v-model="form.bl_prefTime" :min="0" :max="1" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-form-item label="w_损失">
+                      <el-input-number v-model="form.bl_prefLoss" :min="0" :max="1" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-form-item label="w_波动">
+                      <el-input-number v-model="form.bl_prefFlowVar" :min="0" :max="1" :step="0.05" :precision="2"
+                        style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
 
-              <el-divider content-position="left">目标权重</el-divider>
-
-              <el-row :gutter="12">
-                <el-col :span="8">
-                  <el-form-item label="w_时间">
-                    <el-input-number v-model="form.prefWeightTime" :min="0" :max="1" :step="0.05" :precision="2"
-                      style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="8">
-                  <el-form-item label="w_损失">
-                    <el-input-number v-model="form.prefWeightLoss" :min="0" :max="1" :step="0.05" :precision="2"
-                      style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="8">
-                  <el-form-item label="w_波动">
-                    <el-input-number v-model="form.prefWeightFlowVar" :min="0" :max="1" :step="0.05" :precision="2"
-                      style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-
-              <el-form-item label="混合系数 α">
-                <el-input-number v-model="form.alpha" :min="0" :max="1" :step="0.05" :precision="2"
-                  style="width: 100%" />
-              </el-form-item>
+                <el-form-item label="混合系数 α">
+                  <el-input-number v-model="form.bl_alpha" :min="0" :max="1" :step="0.05" :precision="2"
+                    style="width: 100%" />
+                </el-form-item>
+              </template>
 
               <div class="action-row">
                 <el-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="submitOptimize"
                   class="action-primary">
-                  开始优化
+                  {{ activeTab === 'trunk-branch' ? '开始干支优化' : '开始支斗轮续灌优化' }}
                 </el-button>
-                <el-button :disabled="!result" @click="resetResult" class="action-secondary">
+                <el-button :disabled="!activeResult" @click="resetResult" class="action-secondary">
                   清空结果
                 </el-button>
               </div>
@@ -218,7 +329,12 @@
 
             <el-divider content-position="left">接口说明</el-divider>
             <el-descriptions :column="1" border size="small">
-              <el-descriptions-item label="优化接口">/api/v1/irrigation/canal/optimize/full</el-descriptions-item>
+              <el-descriptions-item label="干支接口">
+                /api/v1/irrigation/canal/optimize/trunk-branch
+              </el-descriptions-item>
+              <el-descriptions-item label="支斗接口">
+                /api/v1/irrigation/canal/optimize/branch-lateral
+              </el-descriptions-item>
               <el-descriptions-item label="请求方式">POST / application/json</el-descriptions-item>
               <el-descriptions-item label="鉴权头">X-Irrigation-Api-Key</el-descriptions-item>
               <el-descriptions-item label="返回">结构化 JSON</el-descriptions-item>
@@ -227,122 +343,62 @@
         </el-card>
       </el-col>
 
-      <!-- 右侧：所有图表独立展示 -->
+      <!-- ============ 右侧：结果图表 ============ -->
       <el-col :xs="24" :lg="16" class="result-col">
         <!-- 未提交时的占位 -->
-        <div v-if="!result" class="placeholder glass-card result-card">
+        <div v-if="!activeResult" class="placeholder glass-card result-card">
           <div class="placeholder-title">尚未提交优化</div>
           <div class="placeholder-desc">
-            提交后将在右侧依次展示：KPI 概览卡、熵权 & 目标值、Pareto 3D 前沿、全渠系配水甘特图、干渠流量/水位时序、各支渠斗渠配水甘特图、分组轮灌甘特图、损失构成、Pareto 2D 投影、支渠流量对比。
+            切换 Tab 选择干支优化或支斗轮续灌，配置参数后提交。后端返回结构化 JSON，
+            将在右侧依次展示：KPI 概览卡、甘特图、时序曲线、Pareto 前沿、损失分析。
           </div>
         </div>
 
-        <template v-else>
-          <!-- ============ 区块 1：KPI 概览卡（6 卡 = 沿用 canalHydro 通用 kpi-box） ============ -->
+        <!-- ============ 干支优化结果 ============ -->
+        <template v-else-if="activeTab === 'trunk-branch' && tbResult">
+          <!-- KPI 概览 -->
           <div class="kpi-row">
             <div class="kpi-box kpi-box--0">
               <div class="kpi-label">F1 总输水时间</div>
-              <div class="kpi-value">
-                {{ fmtNumber(result.topsis_summary.total_time_h, 2) }}<span class="kpi-unit">h</span>
-              </div>
+              <div class="kpi-value">{{ fmtNumber(tbResult.topsis_summary?.total_time_h, 2) }}<span
+                  class="kpi-unit">h</span></div>
               <div class="kpi-foot">TOPSIS 优选方案</div>
             </div>
             <div class="kpi-box kpi-box--1">
               <div class="kpi-label">TOPSIS 评分</div>
-              <div class="kpi-value">
-                {{ fmtNumber(result.summary.topsis_score, 4) }}
-              </div>
+              <div class="kpi-value">{{ fmtNumber(tbResult.summary?.topsis_score, 4) }}</div>
               <div class="kpi-foot">越接近 1 越优</div>
             </div>
             <div class="kpi-box kpi-box--2">
-              <div class="kpi-label">F3 干渠流量波动</div>
-              <div class="kpi-value">
-                {{ fmtNumber(result.topsis_summary.flow_var, 3) }}
-              </div>
+              <div class="kpi-label">F3 流量波动</div>
+              <div class="kpi-value">{{ fmtNumber(tbResult.topsis_summary?.flow_var, 4) }}</div>
               <div class="kpi-foot">Var(Q) 越小越平稳</div>
             </div>
             <div class="kpi-box kpi-box--3">
               <div class="kpi-label">F2 全渠系渗漏损失</div>
-              <div class="kpi-value">
-                {{ fmtNumber(result.topsis_summary.total_loss_m3, 0) }}<span class="kpi-unit">m³</span>
-              </div>
+              <div class="kpi-value">{{ fmtNumber(tbResult.topsis_summary?.total_loss_m3, 0) }}<span
+                  class="kpi-unit">m³</span></div>
               <div class="kpi-foot">
-                干 {{ fmtNumber(result.topsis_summary.main_loss_m3, 0) }} +
-                支 {{ fmtNumber(result.topsis_summary.branch_loss_m3, 0) }} +
-                斗 {{ fmtNumber(result.topsis_summary.lateral_loss_m3, 0) }}
+                干 {{ fmtNumber(tbResult.topsis_summary?.trunk_loss_m3, 0) }} +
+                支 {{ fmtNumber(tbResult.topsis_summary?.branch_loss_m3, 0) }}
               </div>
             </div>
             <div class="kpi-box kpi-box--4">
               <div class="kpi-label">渠系规模</div>
-              <div class="kpi-value">
-                {{ result.summary.n_branches }}<span class="kpi-unit">支</span>
-                / {{ nLaterals }}<span class="kpi-unit">斗</span>
-              </div>
-              <div class="kpi-foot">
-                {{ result.summary.n_roots }} 条根渠段（自动识别） · 模式 {{ result.summary.mode }}
-              </div>
+              <div class="kpi-value">{{ tbResult.summary?.n_branches }}<span class="kpi-unit">支</span></div>
+              <div class="kpi-foot">{{ tbResult.summary?.trunk_canal_id }} · 干支优化</div>
             </div>
             <div class="kpi-box kpi-box--5">
-              <div class="kpi-label">根渠段峰值流量（合计）</div>
-              <div class="kpi-value">
-                {{ fmtNumber(result.summary.q_max_m3s, 3) }}<span class="kpi-unit">m³/s</span>
-              </div>
-              <div class="kpi-foot">
-                实际 {{ fmtNumber(result.main_canal.Q_total_m3s, 3) }} m³/s
-              </div>
+              <div class="kpi-label">干渠峰值流量</div>
+              <div class="kpi-value">{{ fmtNumber(tbResult.trunk_canal?.Q_total_m3s, 3) }}<span
+                  class="kpi-unit">m³/s</span></div>
+              <div class="kpi-foot">设计 {{ fmtNumber(tbResult.trunk_canal?.Qmax_m3s, 3) }} m³/s</div>
             </div>
           </div>
 
-          <!-- 根渠段清单 -->
-          <el-card v-if="result.roots?.length" shadow="hover" class="result-card glass-card mb16">
-            <template #header>
-              <div class="card-header">
-                <div>
-                  <div class="card-title">根渠段清单（自动识别）</div>
-                  <div class="card-desc">本次优化覆盖的全部根渠段及其子网络规模。</div>
-                </div>
-                <el-tag size="small" type="primary">
-                  共 {{ result.summary.n_roots }} 条根
-                </el-tag>
-              </div>
-            </template>
-            <el-table :data="result.roots" border size="small" stripe>
-              <el-table-column prop="root_id" label="根渠段" min-width="100" />
-              <el-table-column prop="n_branches" label="支渠数" min-width="80" />
-              <el-table-column prop="n_laterals" label="斗渠数" min-width="80" />
-              <el-table-column label="峰值流量 (m³/s)" min-width="140">
-                <template #default="{ row }">
-                  {{ fmtNumber(row.q_max_m3s, 3) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="输水时间 (h)" min-width="120">
-                <template #default="{ row }">
-                  {{ fmtNumber(row.total_time_h, 2) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="渗漏损失 (m³)" min-width="140">
-                <template #default="{ row }">
-                  {{ fmtNumber(row.total_loss_m3, 0) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="TOPSIS 评分" min-width="120">
-                <template #default="{ row }">
-                  {{ fmtNumber(row.topsis_score, 4) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="状态" min-width="80">
-                <template #default="{ row }">
-                  <el-tag :type="row.ok ? 'success' : 'danger'" size="small">
-                    {{ row.ok ? '成功' : '失败' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-card>
-
-          <!-- ============ 区块 2：熵权 / 目标值 / 损失构成 / Pareto 2D ============ -->
+          <!-- 熵权 / 目标值 / 损失构成 -->
           <el-row :gutter="20" class="chart-row">
-            <el-col :xs="24" :sm="12" :lg="12" :xl="6">
+            <el-col :xs="24" :sm="12" :lg="8">
               <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
@@ -350,10 +406,10 @@
                     <span class="chart-sub">三目标权重</span>
                   </div>
                 </template>
-                <div ref="entropyRef" class="chart" />
+                <div ref="tbEntropyRef" class="chart" />
               </el-card>
             </el-col>
-            <el-col :xs="24" :sm="12" :lg="12" :xl="6">
+            <el-col :xs="24" :sm="12" :lg="8">
               <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
@@ -361,202 +417,264 @@
                     <span class="chart-sub">F1/F2/F3 相对</span>
                   </div>
                 </template>
-                <div ref="objectiveRef" class="chart" />
+                <div ref="tbObjectiveRef" class="chart" />
               </el-card>
             </el-col>
-            <el-col :xs="24" :sm="12" :lg="12" :xl="6">
+            <el-col :xs="24" :sm="12" :lg="8">
               <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
                     <span class="chart-title">损失构成</span>
-                    <span class="chart-sub">干 / 支 / 斗</span>
+                    <span class="chart-sub">干 / 支</span>
                   </div>
                 </template>
-                <div ref="lossPieRef" class="chart" />
-              </el-card>
-            </el-col>
-            <el-col :xs="24" :sm="12" :lg="12" :xl="6">
-              <el-card shadow="hover" class="chart-card glass-card result-card">
-                <template #header>
-                  <div class="chart-header">
-                    <span class="chart-title">Pareto 2D 投影</span>
-                    <span class="chart-sub">F1-F2 / F1-F3</span>
-                  </div>
-                </template>
-                <div ref="pareto2dRef" class="chart" />
+                <div ref="tbLossPieRef" class="chart" />
               </el-card>
             </el-col>
           </el-row>
 
-          <!-- ============ 区块 3：Pareto 3D 前沿 ============ -->
+          <!-- Pareto 前沿 3D -->
           <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
                   <span class="chart-title">Pareto 前沿（3D 散点）</span>
-                  <span class="chart-sub">F1 输水时间 / F2 渗漏损失 / F3 流量波动 · 颜色=TOPSIS 评分</span>
+                  <span class="chart-sub">F1 时间 / F2 损失 / F3 波动 · 颜色=TOPSIS 评分</span>
                 </div>
                 <el-tag size="small" type="success">
-                  已选 {{ paretoSelectedCount }} / {{ result.pareto?.length || 0 }}
+                  已选 {{ tbParetoSelected }} / {{ tbResult.pareto?.length || 0 }}
                 </el-tag>
               </div>
             </template>
-            <div ref="paretoRef" class="chart chart-tall" />
+            <div ref="tbParetoRef" class="chart chart-tall" />
           </el-card>
 
-          <!-- ============ 区块 4：全渠系配水甘特图 ============ -->
+          <!-- 干支配水甘特图 -->
           <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
-                  <span class="chart-title">全渠系配水甘特图</span>
-                  <span class="chart-sub">干-支连续配水 + 支-斗轮灌（组间轮灌、组内续灌）</span>
+                  <span class="chart-title">干支配水甘特图</span>
+                  <span class="chart-sub">干渠连续配水 + 支渠依次开启</span>
                 </div>
                 <div class="chart-tags">
-                  <el-tag size="small" type="primary">干渠 {{ fmtNumber(result.main_canal.duration_h ||
-                    result.main_canal.t_max_h, 2) }} h</el-tag>
-                  <el-tag size="small" type="warning">峰值 {{ fmtNumber(result.main_canal.Q_total_m3s, 3) }} m³/s</el-tag>
+                  <el-tag size="small" type="primary">
+                    干渠 {{ fmtNumber(tbResult.trunk_canal?.t_max_h, 2) }} h
+                  </el-tag>
+                  <el-tag size="small" type="warning">
+                    峰值 {{ fmtNumber(tbResult.trunk_canal?.Q_total_m3s, 3) }} m³/s
+                  </el-tag>
                 </div>
               </div>
             </template>
-            <div ref="fullGanttRef" class="chart chart-tall" />
+            <div ref="tbGanttRef" class="chart chart-tall" />
           </el-card>
 
-          <!-- ============ 区块 5：干渠流量/水位时序 ============ -->
+          <!-- 干渠时序 -->
           <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
                   <span class="chart-title">干渠流量 / 水位 时序</span>
-                  <span class="chart-sub">主调度曲线 · 阶梯式连续配水</span>
-                </div>
-                <div class="chart-tags">
-                  <el-tag size="small">点 {{ result.time_series?.length || 0 }}</el-tag>
+                  <span class="chart-sub">阶梯式连续配水 · 点数 {{ tbResult.time_series?.length || 0 }}</span>
                 </div>
               </div>
             </template>
-            <div ref="timeSeriesRef" class="chart chart-tall" />
+            <div ref="tbTimeSeriesRef" class="chart chart-tall" />
           </el-card>
 
-          <!-- ============ 区块 6：损失堆叠 + 支渠损失对比 ============ -->
-          <el-row :gutter="20" class="chart-row mt16">
-            <el-col :xs="24" :md="12">
+          <!-- 支渠详情表 -->
+          <el-card shadow="hover" class="chart-card glass-card result-card mt16">
+            <template #header>
+              <div class="chart-header">
+                <span class="chart-title">支渠配水详情</span>
+              </div>
+            </template>
+            <el-table :data="tbResult.branches || []" border size="small" stripe>
+              <el-table-column prop="name" label="支渠" min-width="100" />
+              <el-table-column label="设计流量" min-width="110" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.qd, 3) }} m³/s</template>
+              </el-table-column>
+              <el-table-column label="实际流量" min-width="110" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.q_actual, 4) }} m³/s</template>
+              </el-table-column>
+              <el-table-column label="占比" min-width="80" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.ratio, 4) }}</template>
+              </el-table-column>
+              <el-table-column label="开始" min-width="80" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.t_start_h, 2) }} h</template>
+              </el-table-column>
+              <el-table-column label="持续" min-width="80" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.duration_h, 2) }} h</template>
+              </el-table-column>
+              <el-table-column label="结束" min-width="80" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.t_end_h, 2) }} h</template>
+              </el-table-column>
+              <el-table-column label="损失" min-width="100" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.loss_m3, 0) }} m³</template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </template>
+
+        <!-- ============ 支斗轮续灌结果 ============ -->
+        <template v-else-if="activeTab === 'branch-lateral' && blResult">
+          <!-- KPI 概览 -->
+          <div class="kpi-row">
+            <div class="kpi-box kpi-box--0">
+              <div class="kpi-label">F1 总输水时间</div>
+              <div class="kpi-value">{{ fmtNumber(blResult.topsis_summary?.total_time_h, 2) }}<span
+                  class="kpi-unit">h</span></div>
+              <div class="kpi-foot">TOPSIS 优选方案</div>
+            </div>
+            <div class="kpi-box kpi-box--1">
+              <div class="kpi-label">TOPSIS 评分</div>
+              <div class="kpi-value">{{ fmtNumber(blResult.summary?.topsis_score, 4) }}</div>
+              <div class="kpi-foot">越接近 1 越优</div>
+            </div>
+            <div class="kpi-box kpi-box--2">
+              <div class="kpi-label">最优分组数</div>
+              <div class="kpi-value">{{ blResult.summary?.best_n_groups }}<span class="kpi-unit">组</span></div>
+              <div class="kpi-foot">组间轮灌 / 组内续灌</div>
+            </div>
+            <div class="kpi-box kpi-box--3">
+              <div class="kpi-label">F2 渗漏损失</div>
+              <div class="kpi-value">{{ fmtNumber(blResult.topsis_summary?.total_loss_m3, 0) }}<span
+                  class="kpi-unit">m³</span></div>
+              <div class="kpi-foot">
+                支 {{ fmtNumber(blResult.topsis_summary?.branch_loss_m3, 0) }} +
+                斗 {{ fmtNumber(blResult.topsis_summary?.lateral_loss_m3, 0) }}
+              </div>
+            </div>
+            <div class="kpi-box kpi-box--4">
+              <div class="kpi-label">渠系规模</div>
+              <div class="kpi-value">{{ blResult.summary?.n_laterals }}<span class="kpi-unit">斗</span></div>
+              <div class="kpi-foot">{{ blResult.summary?.branch_canal_id }} · 支斗轮续灌</div>
+            </div>
+            <div class="kpi-box kpi-box--5">
+              <div class="kpi-label">支渠设计流量</div>
+              <div class="kpi-value">{{ fmtNumber(blResult.branch_canal?.Q_design_m3s, 3) }}<span
+                  class="kpi-unit">m³/s</span></div>
+              <div class="kpi-foot">轮灌总时间 {{ fmtNumber(blResult.branch_canal?.t_max_h, 2) }} h</div>
+            </div>
+          </div>
+
+          <!-- 熵权 / 目标值 / 损失构成 -->
+          <el-row :gutter="20" class="chart-row">
+            <el-col :xs="24" :sm="12" :lg="8">
               <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
-                    <div>
-                      <span class="chart-title">各级损失堆叠</span>
-                      <span class="chart-sub">干 / 支 / 斗 渗漏量分布</span>
-                    </div>
+                    <span class="chart-title">熵权分布</span>
+                    <span class="chart-sub">三目标权重</span>
                   </div>
                 </template>
-                <div ref="lossBarRef" class="chart chart-tall" />
+                <div ref="blEntropyRef" class="chart" />
               </el-card>
             </el-col>
-            <el-col :xs="24" :md="12">
+            <el-col :xs="24" :sm="12" :lg="8">
               <el-card shadow="hover" class="chart-card glass-card result-card">
                 <template #header>
                   <div class="chart-header">
-                    <div>
-                      <span class="chart-title">支渠流量 / 损失对比</span>
-                      <span class="chart-sub">设计 qd vs 实际 q_actual</span>
-                    </div>
+                    <span class="chart-title">目标值归一化</span>
+                    <span class="chart-sub">F1/F2/F3 相对</span>
                   </div>
                 </template>
-                <div ref="branchBarRef" class="chart chart-tall" />
+                <div ref="blObjectiveRef" class="chart" />
+              </el-card>
+            </el-col>
+            <el-col :xs="24" :sm="12" :lg="8">
+              <el-card shadow="hover" class="chart-card glass-card result-card">
+                <template #header>
+                  <div class="chart-header">
+                    <span class="chart-title">损失构成</span>
+                    <span class="chart-sub">支 / 斗</span>
+                  </div>
+                </template>
+                <div ref="blLossPieRef" class="chart" />
               </el-card>
             </el-col>
           </el-row>
 
-          <!-- ============ 区块 7：分组轮灌甘特图 ============ -->
-          <el-card v-if="result.groups?.length" shadow="hover" class="chart-card glass-card result-card mt16">
+          <!-- Pareto 前沿 3D -->
+          <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
-                  <span class="chart-title">支渠分组轮灌甘特图</span>
-                  <span class="chart-sub">同组内续灌、组与组间轮灌 · 按 parent 支渠分组</span>
+                  <span class="chart-title">Pareto 前沿（3D 散点）</span>
+                  <span class="chart-sub">F1 时间 / F2 损失 / F3 波动 · 颜色=TOPSIS 评分</span>
                 </div>
-                <el-tag size="small" type="info">共 {{ result.groups.length }} 个组</el-tag>
+                <el-tag size="small" type="success">
+                  已选 {{ blParetoSelected }} / {{ blResult.pareto?.length || 0 }}
+                </el-tag>
               </div>
             </template>
-            <div ref="groupGanttRef" class="chart chart-tall" />
+            <div ref="blParetoRef" class="chart chart-tall" />
           </el-card>
 
-          <!-- ============ 区块 8：各支渠下的斗渠配水甘特图（每条支渠一张） ============ -->
-          <div v-for="(b, idx) in result.branches" :key="b.name" class="mt16">
-            <el-card shadow="hover" class="chart-card glass-card result-card">
-              <template #header>
-                <div class="chart-header">
-                  <div>
-                    <span class="chart-title">
-                      支渠 {{ b.name }} 斗渠配水甘特图
-                    </span>
-                    <span class="chart-sub">
-                      设计 qd={{ fmtNumber(b.qd, 2) }} m³/s · 实际 q={{ fmtNumber(b.q_actual, 3) }} m³/s ·
-                      占比 {{ fmtNumber(b.ratio, 4) }} · {{ b.n_laterals }} 斗
-                    </span>
-                  </div>
-                  <div class="chart-tags">
-                    <el-tag size="small" type="primary">
-                      开始 {{ fmtNumber(b.t_start_h, 2) }}h
-                    </el-tag>
-                    <el-tag size="small" type="warning">
-                      持续 {{ fmtNumber(b.duration_h, 2) }}h
-                    </el-tag>
-                    <el-tag size="small" type="danger">
-                      损失 {{ fmtNumber(b.loss_m3, 0) }} m³
-                    </el-tag>
-                  </div>
+          <!-- 轮灌分组甘特图 -->
+          <el-card shadow="hover" class="chart-card glass-card result-card mt16">
+            <template #header>
+              <div class="chart-header">
+                <div>
+                  <span class="chart-title">斗渠轮续灌甘特图</span>
+                  <span class="chart-sub">组间轮灌 · 组内续灌</span>
                 </div>
-              </template>
-              <div :ref="el => setBranchGanttRef(el, idx)" class="chart chart-tall" />
-              <!-- 斗渠详细数据表 -->
-              <el-table :data="getBranchLaterals(b.name)" size="small" stripe border class="mt12 lateral-table">
-                <el-table-column prop="name" label="斗渠" width="110" />
-                <el-table-column label="所属组" width="80" align="center">
-                  <template #default="{ row }">
-                    <el-tag size="small" :type="row.group === 1 ? 'primary' : 'success'">G{{ row.group }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="设计流量" width="100" align="right">
-                  <template #default="{ row }">
-                    {{ fmtNumber(row.Q_design, 2) }} m³/s
-                  </template>
-                </el-table-column>
-                <el-table-column label="实际流量" width="100" align="right">
-                  <template #default="{ row }">
-                    {{ fmtNumber(row.Q_actual, 3) }} m³/s
-                  </template>
-                </el-table-column>
-                <el-table-column label="占比" width="80" align="right">
-                  <template #default="{ row }">
-                    {{ fmtNumber(row.ratio, 4) }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="开始" width="80" align="right">
-                  <template #default="{ row }">
-                    {{ fmtNumber(row.start_h, 2) }} h
-                  </template>
-                </el-table-column>
-                <el-table-column label="持续" width="80" align="right">
-                  <template #default="{ row }">
-                    {{ fmtNumber(row.duration_h, 2) }} h
-                  </template>
-                </el-table-column>
-                <el-table-column label="结束" width="80" align="right">
-                  <template #default="{ row }">
-                    {{ fmtNumber(row.end_h, 2) }} h
-                  </template>
-                </el-table-column>
-                <el-table-column label="渗漏损失" width="100" align="right">
-                  <template #default="{ row }">
-                    {{ fmtNumber(row.loss_m3, 0) }} m³
-                  </template>
-                </el-table-column>
-              </el-table>
-            </el-card>
-          </div>
+                <el-tag size="small" type="primary">
+                  {{ blResult.groups?.length || 0 }} 轮灌组
+                </el-tag>
+              </div>
+            </template>
+            <div ref="blGanttRef" class="chart chart-tall" />
+          </el-card>
+
+          <!-- 斗渠损失柱状图 -->
+          <el-card shadow="hover" class="chart-card glass-card result-card mt16">
+            <template #header>
+              <div class="chart-header">
+                <span class="chart-title">斗渠输水损失</span>
+              </div>
+            </template>
+            <div ref="blLossBarRef" class="chart chart-tall" />
+          </el-card>
+
+          <!-- 斗渠详情表 -->
+          <el-card shadow="hover" class="chart-card glass-card result-card mt16">
+            <template #header>
+              <div class="chart-header">
+                <span class="chart-title">斗渠配水详情</span>
+              </div>
+            </template>
+            <el-table :data="blResult.laterals || []" border size="small" stripe>
+              <el-table-column prop="name" label="斗渠" min-width="100" />
+              <el-table-column label="所属组" min-width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag size="small">G{{ row.group }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="设计流量" min-width="110" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.Q_design, 3) }} m³/s</template>
+              </el-table-column>
+              <el-table-column label="实际流量" min-width="110" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.Q_actual, 4) }} m³/s</template>
+              </el-table-column>
+              <el-table-column label="占比" min-width="80" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.ratio, 4) }}</template>
+              </el-table-column>
+              <el-table-column label="持续" min-width="80" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.duration_h, 2) }} h</template>
+              </el-table-column>
+              <el-table-column label="损失" min-width="100" align="right">
+                <template #default="{ row }">{{ fmtNumber(row.loss_m3, 0) }} m³</template>
+              </el-table-column>
+            </el-table>
+          </el-card>
         </template>
+
+        <!-- 错误提示 -->
+        <div v-if="resultError" class="error-box glass-card result-card mt16">
+          <el-alert type="danger" :title="resultError" show-icon :closable="true" />
+        </div>
       </el-col>
     </el-row>
   </div>
@@ -568,7 +686,7 @@ import { Promotion } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import 'echarts-gl'
 
-import { runFullOptimize, listCanal } from '@/api/agriculture/canal'
+import { runTrunkBranchOptimize, runBranchLateralOptimize, listCanal } from '@/api/agriculture/canal'
 
 defineOptions({ name: 'CanalOptimize' })
 
@@ -577,136 +695,176 @@ const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigatio
 
 const submitting = ref(false)
 const loadingDb = ref(false)
-const result = ref(null)
+const activeTab = ref('trunk-branch')
 const resultError = ref('')
 
-const entropyRef = ref(null)
-const objectiveRef = ref(null)
-const lossPieRef = ref(null)
-const pareto2dRef = ref(null)
-const paretoRef = ref(null)
-const fullGanttRef = ref(null)
-const timeSeriesRef = ref(null)
-const lossBarRef = ref(null)
-const branchBarRef = ref(null)
-const groupGanttRef = ref(null)
-const branchGanttRefs = []
+// 干支结果 & 支斗结果
+const tbResult = ref(null)
+const blResult = ref(null)
 
-let entropyChart = null
-let objectiveChart = null
-let lossPieChart = null
-let pareto2dChart = null
-let paretoChart = null
-let fullGanttChart = null
-let timeSeriesChart = null
-let lossBarChart = null
-let branchBarChart = null
-let groupGanttChart = null
-const branchGanttCharts = []
-let renderToken = 0
+const activeResult = computed(() => activeTab.value === 'trunk-branch' ? tbResult.value : blResult.value)
 
+// Chart refs
+const tbEntropyRef = ref(null)
+const tbObjectiveRef = ref(null)
+const tbLossPieRef = ref(null)
+const tbParetoRef = ref(null)
+const tbGanttRef = ref(null)
+const tbTimeSeriesRef = ref(null)
+const blEntropyRef = ref(null)
+const blObjectiveRef = ref(null)
+const blLossPieRef = ref(null)
+const blParetoRef = ref(null)
+const blGanttRef = ref(null)
+const blLossBarRef = ref(null)
+
+let tbEntropyChart = null, tbObjectiveChart = null, tbLossPieChart = null
+let tbParetoChart = null, tbGanttChart = null, tbTimeSeriesChart = null
+let blEntropyChart = null, blObjectiveChart = null, blLossPieChart = null
+let blParetoChart = null, blGanttChart = null, blLossBarChart = null
+
+const tbParetoSelected = computed(() => (tbResult.value?.pareto || []).filter(p => p.selected).length)
+const blParetoSelected = computed(() => (blResult.value?.pareto || []).filter(p => p.selected).length)
+
+// ── 表单 ──
 const form = reactive({
   apiKey: IRRIGATION_API_KEY,
-  rootCanalId: '',
-  tMax: 360,
-  flowRatioMin: 0.8,
-  flowRatioMax: 1.0,
-  minGroups: 2,
-  maxGroups: 6,
-  popSize: 80,
-  nGen: 60,
-  seed: 1,
-  permeabilityIndexM: 0.4,
-  permeabilityCoefficientA: 1.9,
-  prefWeightTime: 0.4,
-  prefWeightLoss: 0.3,
-  prefWeightFlowVar: 0.3,
-  alpha: 0.5
+  // 干支
+  trunkCanalId: '',
+  tb_tMax: 360, tb_flowRatioMin: 0.6, tb_flowRatioMax: 1.0,
+  tb_popSize: 120, tb_nGen: 120, tb_seed: 1,
+  tb_permIndexM: 0.4, tb_permCoefA: 1.9,
+  tb_prefTime: 0.7, tb_prefLoss: 0.1, tb_prefFlowVar: 0.2,
+  tb_alpha: 0.5,
+  // 支斗
+  branchCanalId: '',
+  bl_tMax: 360, bl_flowRatioMin: 0.6, bl_flowRatioMax: 1.0,
+  bl_minGroups: 2, bl_maxGroups: 6,
+  bl_popSize: 100, bl_nGen: 100, bl_seed: 1,
+  bl_permIndexM: 0.4, bl_permCoefA: 1.9,
+  bl_prefTime: 0.4, bl_prefLoss: 0.3, bl_prefFlowVar: 0.3,
+  bl_alpha: 0.5,
 })
 
 // ── 数据库渠段 ──
 const dbCanals = ref([])
 
-// ── 推断 start_level ──
-const inferredStartLevel = computed(() => {
-  if (!form.rootCanalId) return 1
-  const canal = dbCanals.value.find(c => c.canal_id === form.rootCanalId)
-  if (!canal) return 1
-  const lv = canal.level
-  if (lv !== null && lv !== undefined && String(lv).trim() !== '') {
-    const parsed = parseInt(String(lv).trim(), 10)
-    if (!isNaN(parsed) && parsed >= 1) return parsed
-  }
-  return 1
-})
+// 过滤后的选择列表
+const trunkCanals = computed(() => dbCanals.value.filter(c => c.level === '2'))
+const branchCanals = computed(() => dbCanals.value.filter(c => c.level === '3'))
 
-// ── 收集子树（根 + 下游3级） ──
-const collectedSubtree = computed(() => {
-  if (!form.rootCanalId) return null
-  const root = dbCanals.value.find(c => c.canal_id === form.rootCanalId)
-  if (!root) return null
-
-  const lv = inferredStartLevel.value
-  const upper = lv
-  const middle = lv + 1
-  const lower = lv + 2
-  const levelSet = new Set([upper, middle, lower])
-
-  // 收集 level in [upper, lower] 的所有渠段
-  const included = new Set()
-  const queue = [form.rootCanalId]
+// ── 干支子树预览 ──
+const trunkPreview = computed(() => {
+  if (!form.trunkCanalId) return null
+  const trunk = dbCanals.value.find(c => c.canal_id === form.trunkCanalId)
+  if (!trunk) return null
+  const branchSet = new Set()
+  const queue = [form.trunkCanalId]
   while (queue.length) {
     const pid = queue.shift()
-    included.add(pid)
-    if (levelSet.size === 3 && included.size > 50) break // 防死循环
     for (const c of dbCanals.value) {
-      if (c.parent_id === pid && !included.has(c.canal_id)) {
-        included.add(c.canal_id)
-        queue.push(c.canal_id)
+      if (c.parent_id === pid) {
+        if (c.level === '3') branchSet.add(c.canal_id)
+        if (!branchSet.has(c.canal_id)) queue.push(c.canal_id)
       }
     }
   }
-
-  const canals = dbCanals.value.filter(c => included.has(c.canal_id))
-
-  // 构建 topology
-  const topology = canals
-    .filter(c => c.parent_id != null)
-    .map(c => ({ canal_id: c.canal_id, parent_id: c.parent_id }))
-
-  // 统计
-  const levelCounts = { upper: 0, middle: 0, lower: 0 }
-  for (const c of canals) {
-    const lv2 = parseInt(String(c.level || '').trim(), 10)
-    if (lv2 === upper) levelCounts.upper++
-    else if (lv2 === middle) levelCounts.middle++
-    else if (lv2 === lower) levelCounts.lower++
-  }
-
   return {
-    canals,
-    topology,
     stats: {
-      level_upper: upper,
-      level_middle: middle,
-      level_lower: lower,
-      n_upper: levelCounts.upper,
-      n_middle: levelCounts.middle,
-      n_lower: levelCounts.lower,
+      n_trunk: 1,
+      n_branch: branchSet.size,
     }
   }
 })
 
-const canSubmit = computed(() => {
-  return form.rootCanalId && collectedSubtree.value && collectedSubtree.value.canals.length > 0
+// ── 支斗子树预览 ──
+const branchPreview = computed(() => {
+  if (!form.branchCanalId) return null
+  const branch = dbCanals.value.find(c => c.canal_id === form.branchCanalId)
+  if (!branch) return null
+  const lateralSet = new Set()
+  const queue = [form.branchCanalId]
+  while (queue.length) {
+    const pid = queue.shift()
+    for (const c of dbCanals.value) {
+      if (c.parent_id === pid) {
+        if (c.level === '4') lateralSet.add(c.canal_id)
+        if (!lateralSet.has(c.canal_id)) queue.push(c.canal_id)
+      }
+    }
+  }
+  return {
+    stats: {
+      n_branch: 1,
+      n_lateral: lateralSet.size,
+    }
+  }
 })
 
-function onRootChange() {
-  // 重置结果
+// ── 提交条件 ──
+const canSubmit = computed(() => {
+  if (activeTab.value === 'trunk-branch') {
+    return form.trunkCanalId && trunkPreview.value && trunkPreview.value.stats.n_branch > 0
+  }
+  return form.branchCanalId && branchPreview.value && branchPreview.value.stats.n_lateral > 0
+})
+
+// ── 收集子树 ──
+function collectTrunkSubtree() {
+  const included = new Set([form.trunkCanalId])
+  const queue = [form.trunkCanalId]
+  while (queue.length) {
+    const pid = queue.shift()
+    for (const c of dbCanals.value) {
+      if (c.parent_id === pid && !included.has(c.canal_id)) {
+        if (c.level === '2' || c.level === '3') {
+          included.add(c.canal_id)
+          queue.push(c.canal_id)
+        }
+      }
+    }
+  }
+  const canals = dbCanals.value.filter(c => included.has(c.canal_id))
+  const topology = canals
+    .filter(c => c.parent_id != null)
+    .map(c => ({ canal_id: c.canal_id, parent_id: c.parent_id }))
+  return { canals, topology }
+}
+
+function collectBranchSubtree() {
+  const included = new Set([form.branchCanalId])
+  const queue = [form.branchCanalId]
+  while (queue.length) {
+    const pid = queue.shift()
+    for (const c of dbCanals.value) {
+      if (c.parent_id === pid && !included.has(c.canal_id)) {
+        if (c.level === '3' || c.level === '4') {
+          included.add(c.canal_id)
+          queue.push(c.canal_id)
+        }
+      }
+    }
+  }
+  const canals = dbCanals.value.filter(c => included.has(c.canal_id))
+  const topology = canals
+    .filter(c => c.parent_id != null)
+    .map(c => ({ canal_id: c.canal_id, parent_id: c.parent_id }))
+  return { canals, topology }
+}
+
+function onTabChange() {
   resetResult()
 }
 
-// ── 加载数据库渠段 ──
+function onTrunkChange() {
+  tbResult.value = null
+}
+
+function onBranchChange() {
+  blResult.value = null
+}
+
+// ── 加载数据 ──
 async function loadFromDb() {
   loadingDb.value = true
   try {
@@ -717,21 +875,17 @@ async function loadFromDb() {
       canal_name: r.canal_name ?? r.canalName,
       parent_id: r.parent_id ?? r.parentId ?? null,
       level: r.level != null ? String(r.level) : null,
-      length: parseFloat(r.length ?? r.lengthM ?? 0),
-      design_flow: parseFloat(r.design_flow ?? r.designFlow ?? r.designQM3s ?? 0),
-      design_depth: parseFloat(r.design_depth ?? r.designDepth ?? 0),
-      top_width: parseFloat(r.top_width ?? r.topWidth ?? 0),
+      length: parseFloat(r.length ?? 0),
+      design_flow: parseFloat(r.design_flow ?? r.designFlow ?? 0),
       bottom_width: parseFloat(r.bottom_width ?? r.bottomWidth ?? 0),
       slope: parseFloat(r.slope ?? 0),
-      side_slope: parseFloat(r.side_slope ?? r.sideSlopeM ?? 1.5),
-      roughness: parseFloat(r.roughness ?? r.manningN ?? 0.015),
-      gate_height: parseFloat(r.gate_height ?? r.gateHeightM ?? 0),
-      gate_width: parseFloat(r.gate_width ?? r.gateWidthM ?? 0),
-      min_gate_opening: parseFloat(r.min_gate_opening ?? r.minGateOpeningM ?? 0),
-      max_gate_opening: parseFloat(r.max_gate_opening ?? r.maxGateOpeningM ?? 0),
+      side_slope: parseFloat(r.side_slope ?? 1.5),
+      roughness: parseFloat(r.roughness ?? 0.015),
       water_demand: parseFloat(r.water_demand ?? r.waterDemand ?? 0),
-    }))
-    form.rootCanalId = ''
+      position: parseFloat(r.position ?? 0),
+    })).filter(r => r.canal_id != null)
+    form.trunkCanalId = ''
+    form.branchCanalId = ''
     proxy.$modal.msgSuccess(`已加载 ${dbCanals.value.length} 条渠段`)
   } catch (err) {
     proxy.$modal.msgError('获取渠系数据失败：' + (err?.message || err))
@@ -741,34 +895,29 @@ async function loadFromDb() {
 }
 
 function resetResult() {
-  renderToken += 1
-  result.value = null
+  tbResult.value = null
+  blResult.value = null
   resultError.value = ''
-  destroyCharts()
+  destroyAllCharts()
 }
 
-function destroyCharts() {
+function destroyAllCharts() {
   ;[
-    entropyChart, objectiveChart, lossPieChart, pareto2dChart,
-    paretoChart, fullGanttChart, timeSeriesChart, lossBarChart,
-    branchBarChart, groupGanttChart
+    tbEntropyChart, tbObjectiveChart, tbLossPieChart,
+    tbParetoChart, tbGanttChart, tbTimeSeriesChart,
+    blEntropyChart, blObjectiveChart, blLossPieChart,
+    blParetoChart, blGanttChart, blLossBarChart,
   ].forEach(c => { if (c) c.dispose() })
-  entropyChart = objectiveChart = lossPieChart = pareto2dChart = null
-  paretoChart = fullGanttChart = timeSeriesChart = lossBarChart = null
-  branchBarChart = groupGanttChart = null
-  branchGanttCharts.forEach(c => { if (c) c.dispose() })
-  branchGanttCharts.length = 0
-  branchGanttRefs.length = 0
+  tbEntropyChart = tbObjectiveChart = tbLossPieChart = null
+  tbParetoChart = tbGanttChart = tbTimeSeriesChart = null
+  blEntropyChart = blObjectiveChart = blLossPieChart = null
+  blParetoChart = blGanttChart = blLossBarChart = null
 }
 
 function fmtNumber(value, digits = 2) {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return '--'
-  }
+  if (value === null || value === undefined || Number.isNaN(value)) return '--'
   const num = Number(value)
-  if (!Number.isFinite(num)) {
-    return '--'
-  }
+  if (!Number.isFinite(num)) return '--'
   return num.toFixed(digits)
 }
 
@@ -778,28 +927,15 @@ const COLOR_PALETTE = [
   '#6366f1', '#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6'
 ]
 
-function getColor(i) {
-  return COLOR_PALETTE[i % COLOR_PALETTE.length]
+function getColor(i) { return COLOR_PALETTE[i % COLOR_PALETTE.length] }
+
+function initChart(el, chartRef) {
+  if (!el || !el.isConnected) return null
+  if (chartRef) { chartRef.dispose() }
+  return echarts.init(el)
 }
 
-const nLaterals = computed(() => (result.value?.laterals || []).length)
-const paretoSelectedCount = computed(() => (result.value?.pareto || []).filter(p => p.selected).length)
-
-function getBranchLaterals(branchName) {
-  if (!result.value) return []
-  return (result.value.laterals || [])
-    .filter(l => l.parent === branchName || l.parent_id === branchName)
-    .slice()
-    .sort((a, b) => {
-      if (a.group !== b.group) return a.group - b.group
-      return a.name.localeCompare(b.name)
-    })
-}
-
-function setBranchGanttRef(el, idx) {
-  if (el) branchGanttRefs[idx] = el
-}
-
+// ── 提交 ──
 async function submitOptimize() {
   if (!canSubmit.value) return
   if (!form.apiKey.trim()) {
@@ -807,59 +943,33 @@ async function submitOptimize() {
     return
   }
 
-  const requestToken = ++renderToken
-  result.value = null
+  const requestToken = Date.now()
   resultError.value = ''
-  destroyCharts()
+  destroyAllCharts()
   submitting.value = true
 
   try {
-    const st = collectedSubtree.value
-    const payload = {
-      canals: st.canals.map(c => ({
-        canal_id: c.canal_id,
-        canal_name: c.canal_name || null,
-        level: c.level,
-        length: c.length,
-        design_flow: c.design_flow,
-        design_depth: c.design_depth,
-        top_width: c.top_width,
-        bottom_width: c.bottom_width,
-        slope: c.slope,
-        side_slope: c.side_slope,
-        roughness: c.roughness,
-        gate_height: c.gate_height,
-        gate_width: c.gate_width,
-        min_gate_opening: c.min_gate_opening,
-        max_gate_opening: c.max_gate_opening,
-        water_demand: c.water_demand,
-        parent_id: c.parent_id,
-      })),
-      topology: st.topology,
-      start_level: inferredStartLevel.value,
-      t_max: form.tMax,
-      flow_ratio_min: form.flowRatioMin,
-      flow_ratio_max: form.flowRatioMax,
-      min_groups: form.minGroups,
-      max_groups: form.maxGroups,
-      pop_size: form.popSize,
-      n_gen: form.nGen,
-      seed: form.seed,
-      permeability_index: form.permeabilityIndexM,
-      permeability_coefficient: form.permeabilityCoefficientA,
-      pref_weight_time: form.prefWeightTime,
-      pref_weight_loss: form.prefWeightLoss,
-      pref_weight_flow_var: form.prefWeightFlowVar,
-      alpha: form.alpha,
+    if (activeTab.value === 'trunk-branch') {
+      tbResult.value = null
+      const { canals, topology } = collectTrunkSubtree()
+      const payload = buildTrunkPayload(canals, topology)
+      const data = await runTrunkBranchOptimize(payload, form.apiKey.trim())
+      if (requestToken !== requestToken) return
+      tbResult.value = data
+      await nextTick()
+      renderTrunkBranchCharts()
+    } else {
+      blResult.value = null
+      const { canals, topology } = collectBranchSubtree()
+      const payload = buildBranchPayload(canals, topology)
+      const data = await runBranchLateralOptimize(payload, form.apiKey.trim())
+      if (requestToken !== requestToken) return
+      blResult.value = data
+      await nextTick()
+      renderBranchLateralCharts()
     }
-    const data = await runFullOptimize(payload, form.apiKey.trim())
-    if (requestToken !== renderToken) return
-    result.value = data
     proxy.$modal.msgSuccess('优化完成')
-    await nextTick()
-    renderAllCharts()
   } catch (err) {
-    if (requestToken !== renderToken) return
     resultError.value = err?.message || '优化失败'
     proxy.$modal?.msgError?.(resultError.value)
   } finally {
@@ -867,168 +977,179 @@ async function submitOptimize() {
   }
 }
 
-function initChart(el, currentChart) {
-  if (!el || !el.isConnected) return null
-  if (currentChart) currentChart.dispose()
-  return echarts.init(el)
+function buildTrunkPayload(canals, topology) {
+  return {
+    mode: 'trunk-branch',
+    canals: canals.map(c => ({
+      canal_id: c.canal_id,
+      canal_name: c.canal_name || null,
+      level: c.level,
+      length: c.length,
+      design_flow: c.design_flow,
+      design_depth: 0.0,
+      top_width: 0.0,
+      bottom_width: c.bottom_width,
+      slope: c.slope,
+      side_slope: c.side_slope,
+      roughness: c.roughness,
+      gate_height: 0.0,
+      gate_width: 0.0,
+      min_gate_opening: 0.0,
+      max_gate_opening: 0.0,
+      water_demand: c.water_demand,
+      parent_id: c.parent_id,
+    })),
+    topology: topology.map(t => ({ canal_id: t.canal_id, parent_id: t.parent_id })),
+    trunk_canal_id: form.trunkCanalId,
+    t_max: form.tb_tMax,
+    flow_ratio_min: form.tb_flowRatioMin,
+    flow_ratio_max: form.tb_flowRatioMax,
+    pop_size: form.tb_popSize,
+    n_gen: form.tb_nGen,
+    seed: form.tb_seed,
+    permeability_index: form.tb_permIndexM,
+    permeability_coefficient: form.tb_permCoefA,
+    pref_weight_time: form.tb_prefTime,
+    pref_weight_loss: form.tb_prefLoss,
+    pref_weight_flow_var: form.tb_prefFlowVar,
+    alpha: form.tb_alpha,
+  }
 }
 
-function renderAllCharts() {
-  if (!result.value) return
-  renderEntropy()
-  renderObjective()
-  renderLossPie()
-  renderPareto2D()
-  renderPareto()
-  renderFullGantt()
-  renderTimeSeries()
-  renderLossBar()
-  renderBranchBar()
-  if (result.value.groups?.length) renderGroupGantt()
-  renderBranchGantts()
-  setTimeout(() => {
-    window.dispatchEvent(new Event('resize'))
-  }, 50)
+function buildBranchPayload(canals, topology) {
+  return {
+    mode: 'branch-lateral',
+    canals: canals.map(c => ({
+      canal_id: c.canal_id,
+      canal_name: c.canal_name || null,
+      level: c.level,
+      length: c.length,
+      design_flow: c.design_flow,
+      design_depth: 0.0,
+      top_width: 0.0,
+      bottom_width: c.bottom_width,
+      slope: c.slope,
+      side_slope: c.side_slope,
+      roughness: c.roughness,
+      gate_height: 0.0,
+      gate_width: 0.0,
+      min_gate_opening: 0.0,
+      max_gate_opening: 0.0,
+      water_demand: c.water_demand,
+      parent_id: c.parent_id,
+    })),
+    topology: topology.map(t => ({ canal_id: t.canal_id, parent_id: t.parent_id })),
+    branch_canal_id: form.branchCanalId,
+    t_max: form.bl_tMax,
+    flow_ratio_min: form.bl_flowRatioMin,
+    flow_ratio_max: form.bl_flowRatioMax,
+    min_groups: form.bl_minGroups,
+    max_groups: form.bl_maxGroups,
+    pop_size: form.bl_popSize,
+    n_gen: form.bl_nGen,
+    seed: form.bl_seed,
+    permeability_index: form.bl_permIndexM,
+    permeability_coefficient: form.bl_permCoefA,
+    pref_weight_time: form.bl_prefTime,
+    pref_weight_loss: form.bl_prefLoss,
+    pref_weight_flow_var: form.bl_prefFlowVar,
+    alpha: form.bl_alpha,
+  }
 }
 
-function renderEntropy() {
-  entropyChart = initChart(entropyRef.value, entropyChart)
-  if (!entropyChart) return
-  const w = result.value.summary.entropy_weights || {}
+// ================================================================
+// 干支优化图表渲染
+// ================================================================
+function renderTrunkBranchCharts() {
+  renderTbEntropy()
+  renderTbObjective()
+  renderTbLossPie()
+  renderTbPareto()
+  renderTbGantt()
+  renderTbTimeSeries()
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 50)
+}
+
+function renderTbEntropy() {
+  tbEntropyChart = initChart(tbEntropyRef.value, tbEntropyChart)
+  if (!tbEntropyChart) return
+  const w = tbResult.value?.summary?.entropy_weights || {}
   const data = [
     { name: 'F1 输水时间', value: Number(w.F1_time || 0) },
     { name: 'F2 渗漏损失', value: Number(w.F2_loss || 0) },
-    { name: 'F3 流量波动', value: Number(w.F3_flow_var || 0) }
+    { name: 'F3 流量波动', value: Number(w.F3_flow_var || 0) },
   ]
-  entropyChart.setOption({
+  tbEntropyChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}<br/>权重 {c} ({d}%)' },
     legend: { bottom: 0, textStyle: { fontSize: 12 } },
     series: [{
-      type: 'pie',
-      radius: ['45%', '70%'],
-      center: ['50%', '45%'],
-      avoidLabelOverlap: true,
+      type: 'pie', radius: ['45%', '70%'], center: ['50%', '45%'],
       itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
       label: { formatter: '{b}\n{d}%', fontSize: 11 },
-      data,
-      color: ['#5b8def', '#ef4444', '#f59e0b']
+      data, color: ['#5b8def', '#ef4444', '#f59e0b']
     }]
   })
 }
 
-function renderObjective() {
-  objectiveChart = initChart(objectiveRef.value, objectiveChart)
-  if (!objectiveChart) return
-  const o = result.value.summary.objective_values || {}
-  const f1 = Number(o.F1_total_time_h || 0)
-  const f2 = Number(o.F2_total_loss_m3 || 0)
-  const f3 = Number(o.F3_flow_var || 0)
-  // 归一化：每个值除以三个值中的最大值，便于同图比较
-  const f1n = f1 / Math.max(f1, 1)
-  const f2n = f2 / Math.max(f2, 1)
-  const f3n = f3 / Math.max(f3, 1)
-  objectiveChart.setOption({
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' },
-      formatter: (params) => {
-        const p = params[0]
-        return `<b>${p.name}</b><br/>相对值 ${p.value.toFixed(4)}<br/>原始 ${[f1, f2, f3][p.dataIndex].toFixed(2)}`
-      }
-    },
+function renderTbObjective() {
+  tbObjectiveChart = initChart(tbObjectiveRef.value, tbObjectiveChart)
+  if (!tbObjectiveChart) return
+  const o = tbResult.value?.summary?.objective_values || {}
+  const vals = [Number(o.F1_total_time_h || 0), Number(o.F2_total_loss_m3 || 0), Number(o.F3_flow_var || 0)]
+  const mx = Math.max(...vals, 1)
+  tbObjectiveChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { top: 30, left: 50, right: 30, bottom: 30 },
-    xAxis: {
-      type: 'category',
-      data: ['F1 时间', 'F2 损失', 'F3 波动'],
-      axisLabel: { fontSize: 12 }
-    },
+    xAxis: { type: 'category', data: ['F1 时间', 'F2 损失', 'F3 波动'], axisLabel: { fontSize: 12 } },
     yAxis: { type: 'value', name: '相对值', axisLabel: { fontSize: 11 } },
     series: [{
-      type: 'bar',
+      type: 'bar', barWidth: '50%',
       data: [
-        { value: f1n, itemStyle: { color: '#5b8def' } },
-        { value: f2n, itemStyle: { color: '#ef4444' } },
-        { value: f3n, itemStyle: { color: '#f59e0b' } }
+        { value: vals[0] / mx, itemStyle: { color: '#5b8def' } },
+        { value: vals[1] / mx, itemStyle: { color: '#ef4444' } },
+        { value: vals[2] / mx, itemStyle: { color: '#f59e0b' } },
       ],
-      barWidth: '50%',
       label: { show: true, position: 'top', formatter: ({ value }) => value.toFixed(2) }
     }]
   })
 }
 
-function renderLossPie() {
-  lossPieChart = initChart(lossPieRef.value, lossPieChart)
-  if (!lossPieChart) return
-  const s = result.value.topsis_summary
+function renderTbLossPie() {
+  tbLossPieChart = initChart(tbLossPieRef.value, tbLossPieChart)
+  if (!tbLossPieChart) return
+  const s = tbResult.value?.topsis_summary || {}
   const data = [
-    { name: '干渠损失', value: Number(s.main_loss_m3 || 0) },
+    { name: '干渠损失', value: Number(s.trunk_loss_m3 || 0) },
     { name: '支渠损失', value: Number(s.branch_loss_m3 || 0) },
-    { name: '斗渠损失', value: Number(s.lateral_loss_m3 || 0) }
   ]
-  lossPieChart.setOption({
+  tbLossPieChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}<br/>{c} m³ ({d}%)' },
     legend: { bottom: 0, textStyle: { fontSize: 12 } },
     series: [{
-      type: 'pie',
-      roseType: 'radius',
-      radius: ['25%', '70%'],
-      center: ['50%', '45%'],
+      type: 'pie', radius: ['25%', '70%'], center: ['50%', '45%'],
       itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
       label: { formatter: '{b}\n{d}%', fontSize: 11 },
-      data,
-      color: ['#5b8def', '#22c55e', '#f97316']
+      data, color: ['#5b8def', '#22c55e']
     }]
   })
 }
 
-function renderPareto2D() {
-  pareto2dChart = initChart(pareto2dRef.value, pareto2dChart)
-  if (!pareto2dChart) return
-  const data = result.value.pareto || []
-  pareto2dChart.setOption({
-    tooltip: { trigger: 'item', formatter: (p) => `${p.seriesName}<br/>F1=${p.value[0].toFixed(2)}<br/>F2=${p.value[1].toFixed(2)}<br/>score=${p.value[2].toFixed(4)}${p.value[3] ? '<br/>★ 已选' : ''}` },
-    legend: { bottom: 0, textStyle: { fontSize: 12 } },
-    grid: { top: 20, left: 50, right: 20, bottom: 40 },
-    xAxis: { type: 'value', name: 'F1 时间 (h)', nameLocation: 'middle', nameGap: 25, nameTextStyle: { fontSize: 11 } },
-    yAxis: { type: 'value', name: 'F2 损失 (m³)', nameTextStyle: { fontSize: 11 } },
-    series: [
-      {
-        name: 'F1-F2',
-        type: 'scatter',
-        symbolSize: 9,
-        data: data.map(d => ({
-          value: [d.F1, d.F2, d.score, d.selected],
-          itemStyle: d.selected
-            ? { color: '#ec8e5a', borderColor: '#fff', borderWidth: 2 }
-            : { color: '#5b8def', opacity: 0.7 }
-        }))
-      }
-    ]
-  })
-}
-
-function renderPareto() {
-  paretoChart = initChart(paretoRef.value, paretoChart)
-  if (!paretoChart) return
-  const data = result.value.pareto
+function renderTbPareto() {
+  tbParetoChart = initChart(tbParetoRef.value, tbParetoChart)
+  if (!tbParetoChart) return
+  const data = tbResult.value?.pareto || []
+  if (!data.length) return
   const option = {
     title: { text: 'Pareto 前沿（3D 散点）', left: 'center', textStyle: { fontSize: 14 } },
-    tooltip: {
-      trigger: 'item',
-      formatter: (p) => {
-        const d = p.data
-        return `F1=${d.value[0].toFixed(2)} h<br/>F2=${d.value[1].toFixed(2)} m³<br/>F3=${d.value[2].toFixed(3)}<br/>score=${d.value[3].toFixed(4)}${d.value[4] ? '<br/>★ TOPSIS 优选' : ''}`
-      }
-    },
+    tooltip: { trigger: 'item', formatter: (p) => {
+      const d = p.data
+      return `F1=${d.value[0].toFixed(2)} h<br/>F2=${d.value[1].toFixed(2)} m³<br/>F3=${d.value[2].toFixed(4)}<br/>score=${d.value[3].toFixed(4)}${d.value[4] ? '<br/>★ TOPSIS 优选' : ''}`
+    }},
     visualMap: {
-      show: true,
-      dimension: 3,
+      show: true, dimension: 3,
       min: Math.min(...data.map(d => d.score)),
       max: Math.max(...data.map(d => d.score)),
-      orient: 'vertical',
-      right: 10,
-      top: 'center',
-      calculable: true,
+      orient: 'vertical', right: 10, top: 'center', calculable: true,
       text: ['score', ''],
       inRange: { color: ['#bfdfd2', '#53999d', '#ecb66b', '#ec8e5a'] }
     },
@@ -1036,799 +1157,364 @@ function renderPareto() {
     yAxis3D: { name: 'F2: 渗漏损失 (m³)', type: 'value' },
     zAxis3D: { name: 'F3: 流量波动', type: 'value' },
     grid3D: {
-      boxWidth: 110,
-      boxDepth: 110,
+      boxWidth: 110, boxDepth: 110,
       viewControl: { projection: 'perspective', alpha: 20, beta: 30 },
       light: { main: { intensity: 1.2 }, ambient: { intensity: 0.3 } }
     },
     series: [{
-      type: 'scatter3D',
-      symbolSize: 12,
+      type: 'scatter3D', symbolSize: 12,
       data: data.map(d => ({
         value: [d.F1, d.F2, d.F3, d.score, d.selected],
-        itemStyle: d.selected
-          ? { color: '#ec8e5a', borderColor: '#fff', borderWidth: 2 }
-          : undefined
+        itemStyle: d.selected ? { color: '#ec8e5a', borderColor: '#fff', borderWidth: 2 } : undefined
       }))
     }]
   }
   if (data.some(d => d.selected)) {
     option.series.push({
-      type: 'scatter3D',
-      symbolSize: 26,
-      symbol: 'star',
+      type: 'scatter3D', symbolSize: 26, symbol: 'star',
       data: data.filter(d => d.selected).map(d => ({ value: [d.F1, d.F2, d.F3, d.score, true] })),
       itemStyle: { color: '#ec8e5a' }
     })
   }
-  paretoChart.setOption(option)
+  tbParetoChart.setOption(option)
 }
 
-function buildGanttSeries(rows, getStart, getDuration, getColorIdx) {
-  return rows.map((r, i) => ({
-    name: r.name || r.label,
-    type: 'custom',
-    renderItem: (params, api) => {
-      const categoryIndex = api.value(0)
-      const duration = api.value(1)
-      const start = api.value(2)
-      const end = start + duration
-      const y = api.coord([0, categoryIndex])
-      const x0 = api.coord([start, categoryIndex])
-      const x1 = api.coord([end, categoryIndex])
-      const height = api.size([0, 1])[1] * 0.6
-      return {
-        type: 'rect',
-        shape: {
-          x: x0[0],
-          y: y[1] - height / 2,
-          width: Math.max(x1[0] - x0[0], 1),
-          height
-        },
-        style: api.style({
-          fill: getColor(getColorIdx ? getColorIdx(r, i) : i),
-          stroke: '#fff',
-          lineWidth: 1
-        })
-      }
-    },
-    encode: { x: [1, 2], y: 0 },
-    data: [[i, getDuration(r), getStart(r)]]
-  }))
-}
-
-function renderFullGantt() {
-  fullGanttChart = initChart(fullGanttRef.value, fullGanttChart)
-  if (!fullGanttChart) return
-  const branches = result.value.branches || []
-  const laterals = result.value.laterals || []
-  const mainData = result.value.main_canal || {}
-
+function renderTbGantt() {
+  tbGanttChart = initChart(tbGanttRef.value, tbGanttChart)
+  if (!tbGanttChart) return
+  const branches = tbResult.value?.branches || []
+  const trunk = tbResult.value?.trunk_canal || {}
   const rows = []
-  // 干渠
-  rows.push({
-    name: '干渠 G' + (result.value.summary.main_canal_id || ''), isMain: true,
-    t_start: 0, duration: mainData.t_max_h || mainData.duration_h || 0
-  })
-  // 支渠
+  rows.push({ name: '干渠 ' + (tbResult.value?.summary?.trunk_canal_id || ''), isTrunk: true, t_start: 0, duration: Number(trunk.t_max_h || 0) })
   branches.forEach(b => {
-    rows.push({
-      name: `支渠 ${b.name}`,
-      t_start: Number(b.t_start_h || 0),
-      duration: Number(b.duration_h || 0),
-      branch: b
-    })
+    rows.push({ name: '支渠 ' + b.name, isBranch: true, t_start: Number(b.t_start_h || 0), duration: Number(b.duration_h || 0) })
   })
-  // 斗渠
-  branches.forEach(b => {
-    const bLaterals = laterals
-      .filter(l => (l.parent === b.name || l.parent_id === b.name))
-      .sort((a, c) => {
-        if (a.group !== c.group) return a.group - c.group
-        return a.name.localeCompare(c.name)
-      })
-    bLaterals.forEach(l => {
-      rows.push({
-        name: `  · ${l.name} (G${l.group})`,
-        t_start: Number(l.start_h || l.t_start_h || 0),
-        duration: Number(l.duration_h || 0),
-        group: l.group,
-        lateral: l
-      })
-    })
-  })
-
   const yCategories = rows.map(r => r.name)
   const series = rows.map((r, i) => ({
-    name: r.name,
-    type: 'custom',
+    name: r.name, type: 'custom',
     renderItem: (params, api) => {
-      const ci = api.value(0)
-      const duration = api.value(1)
-      const start = api.value(2)
-      const end = start + duration
-      const y = api.coord([0, ci])
-      const x0 = api.coord([start, ci])
-      const x1 = api.coord([end, ci])
+      const x0 = api.coord([r.t_start, i])[0]
+      const x1 = api.coord([r.t_start + r.duration, i])[0]
+      const y = api.coord([0, i])[1]
       const height = api.size([0, 1])[1] * 0.55
-      let color = getColor(ci)
-      if (r.isMain) color = '#0f172a'
-      else if (r.branch) color = '#5b8def'
-      else if (r.group === 1) color = '#22c55e'
-      else if (r.group === 2) color = '#f59e0b'
       return {
         type: 'rect',
-        shape: {
-          x: x0[0],
-          y: y[1] - height / 2,
-          width: Math.max(x1[0] - x0[0], 1),
-          height
-        },
-        style: { fill: color, stroke: '#fff', lineWidth: 1 }
+        shape: { x: x0, y: y - height / 2, width: Math.max(x1 - x0, 1), height },
+        style: { fill: r.isTrunk ? '#0f172a' : '#5b8def', stroke: '#fff', lineWidth: 1 }
       }
     },
-    encode: { x: [1, 2], y: 0 },
-    data: [[i, r.duration, r.t_start]]
+    encode: { x: [0, 1], y: 0 },
+    data: [[r.t_start, r.duration, i]]
   }))
-
-  fullGanttChart.setOption({
-    tooltip: {
-      trigger: 'item',
-      formatter: (p) => {
-        const r = rows[p.dataIndex]
-        const start = fmtNumber(r.t_start, 2)
-        const dur = fmtNumber(r.duration, 2)
-        const end = fmtNumber(r.t_start + r.duration, 2)
-        if (r.isMain) return `<b>${r.name}</b><br/>开始 ${start} h · 持续 ${dur} h · 结束 ${end} h`
-        if (r.branch) return `<b>${r.name}</b><br/>设计 qd=${fmtNumber(r.branch.qd, 2)} m³/s<br/>实际 q=${fmtNumber(r.branch.q_actual, 3)} m³/s<br/>占比 ${fmtNumber(r.branch.ratio, 4)}<br/>开始 ${start} h · 持续 ${dur} h`
-        if (r.lateral) return `<b>${r.lateral.name} (G${r.lateral.group})</b><br/>设计 ${fmtNumber(r.lateral.Q_design, 2)} · 实际 ${fmtNumber(r.lateral.Q_actual, 3)} m³/s<br/>开始 ${start} h · 持续 ${dur} h · 损失 ${fmtNumber(r.lateral.loss_m3, 0)} m³`
-        return ''
-      }
-    },
-    grid: { top: 30, left: 140, right: 30, bottom: 40 },
+  tbGanttChart.setOption({
+    tooltip: { trigger: 'item', formatter: (p) => {
+      const r = rows[p.dataIndex]
+      return `<b>${r.name}</b><br/>开始 ${fmtNumber(r.t_start, 2)} h · 持续 ${fmtNumber(r.duration, 2)} h`
+    }},
+    grid: { top: 30, left: 120, right: 30, bottom: 40 },
     xAxis: { type: 'value', name: '时间 (h)', nameLocation: 'middle', nameGap: 25 },
-    yAxis: { type: 'category', data: yCategories, name: '渠段', axisLabel: { fontSize: 11 } },
-    dataZoom: [
-      { type: 'inside', xAxisIndex: 0 },
-      { type: 'slider', xAxisIndex: 0, height: 18, bottom: 5 }
-    ],
+    yAxis: { type: 'category', data: yCategories, axisLabel: { fontSize: 11 } },
+    dataZoom: [{ type: 'inside', xAxisIndex: 0 }, { type: 'slider', xAxisIndex: 0, height: 18, bottom: 5 }],
     series
   })
 }
 
-function renderTimeSeries() {
-  timeSeriesChart = initChart(timeSeriesRef.value, timeSeriesChart)
-  if (!timeSeriesChart) return
-  const ts = result.value.time_series || []
-  timeSeriesChart.setOption({
+function renderTbTimeSeries() {
+  tbTimeSeriesChart = initChart(tbTimeSeriesRef.value, tbTimeSeriesChart)
+  if (!tbTimeSeriesChart) return
+  const ts = tbResult.value?.time_series || []
+  tbTimeSeriesChart.setOption({
     tooltip: { trigger: 'axis' },
     legend: { top: 0, data: ['Q (m³/s)', 'H (m)'], textStyle: { fontSize: 12 } },
     grid: { top: 36, left: 60, right: 60, bottom: 50 },
     xAxis: {
-      type: 'category',
-      data: ts.map(p => p.t_h),
-      name: '时间 (h)',
-      nameLocation: 'middle',
-      nameGap: 25,
+      type: 'category', data: ts.map(p => p.t_h), name: '时间 (h)',
+      nameLocation: 'middle', nameGap: 25,
       axisLabel: { interval: Math.max(0, Math.floor(ts.length / 12) - 1) }
     },
     yAxis: [
       { type: 'value', name: 'Q (m³/s)', position: 'left', nameTextStyle: { fontSize: 11 } },
       { type: 'value', name: 'H (m)', position: 'right', nameTextStyle: { fontSize: 11 } }
     ],
-    dataZoom: [
-      { type: 'inside' },
-      { type: 'slider', height: 18, bottom: 5 }
-    ],
+    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 5 }],
     series: [
-      {
-        name: 'Q (m³/s)',
-        type: 'line',
-        smooth: false,
-        symbol: 'none',
-        step: 'end',
+      { name: 'Q (m³/s)', type: 'line', smooth: false, symbol: 'none', step: 'end',
         lineStyle: { width: 2, color: '#5b8def' },
         areaStyle: { color: 'rgba(91,141,239,0.18)' },
-        data: ts.map(p => p.Q_m3s)
-      },
-      {
-        name: 'H (m)',
-        type: 'line',
-        smooth: false,
-        symbol: 'none',
-        yAxisIndex: 1,
-        lineStyle: { width: 2, color: '#22c55e' },
-        data: ts.map(p => p.H_m)
-      }
+        data: ts.map(p => p.Q_m3s) },
+      { name: 'H (m)', type: 'line', smooth: false, symbol: 'none',
+        yAxisIndex: 1, lineStyle: { width: 2, color: '#22c55e' },
+        data: ts.map(p => p.H_m) },
     ]
   })
 }
 
-function renderLossBar() {
-  lossBarChart = initChart(lossBarRef.value, lossBarChart)
-  if (!lossBarChart) return
-  const s = result.value.topsis_summary
-  lossBarChart.setOption({
+// ================================================================
+// 支斗轮续灌图表渲染
+// ================================================================
+function renderBranchLateralCharts() {
+  renderBlEntropy()
+  renderBlObjective()
+  renderBlLossPie()
+  renderBlPareto()
+  renderBlGantt()
+  renderBlLossBar()
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 50)
+}
+
+function renderBlEntropy() {
+  blEntropyChart = initChart(blEntropyRef.value, blEntropyChart)
+  if (!blEntropyChart) return
+  const w = blResult.value?.summary?.entropy_weights || {}
+  const data = [
+    { name: 'F1 输水时间', value: Number(w.F1_time || 0) },
+    { name: 'F2 渗漏损失', value: Number(w.F2_loss || 0) },
+    { name: 'F3 时间差异', value: Number(w.F3_flow_var || 0) },
+  ]
+  blEntropyChart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}<br/>权重 {c} ({d}%)' },
+    legend: { bottom: 0, textStyle: { fontSize: 12 } },
+    series: [{
+      type: 'pie', radius: ['45%', '70%'], center: ['50%', '45%'],
+      itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+      label: { formatter: '{b}\n{d}%', fontSize: 11 },
+      data, color: ['#5b8def', '#ef4444', '#f59e0b']
+    }]
+  })
+}
+
+function renderBlObjective() {
+  blObjectiveChart = initChart(blObjectiveRef.value, blObjectiveChart)
+  if (!blObjectiveChart) return
+  const o = blResult.value?.summary?.objective_values || {}
+  const vals = [Number(o.F1_total_loss_m3 || 0), Number(o.F2_flow_diff || 0), Number(o.F3_time_diff || 0)]
+  const mx = Math.max(...vals, 1)
+  blObjectiveChart.setOption({
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: { top: 0, textStyle: { fontSize: 12 } },
-    grid: { top: 36, left: 50, right: 30, bottom: 30 },
-    xAxis: { type: 'category', data: ['渗漏损失构成'] },
-    yAxis: { type: 'value', name: 'm³', nameTextStyle: { fontSize: 11 } },
-    series: [
-      {
-        name: '干渠',
-        type: 'bar',
-        stack: 'loss',
-        itemStyle: { color: '#5b8def' },
-        data: [Number(s.main_loss_m3 || 0)],
-        label: { show: true, position: 'inside', formatter: ({ value }) => fmtNumber(value, 0) }
-      },
-      {
-        name: '支渠',
-        type: 'bar',
-        stack: 'loss',
-        itemStyle: { color: '#22c55e' },
-        data: [Number(s.branch_loss_m3 || 0)],
-        label: { show: true, position: 'inside', formatter: ({ value }) => fmtNumber(value, 0) }
-      },
-      {
-        name: '斗渠',
-        type: 'bar',
-        stack: 'loss',
-        itemStyle: { color: '#f97316' },
-        data: [Number(s.lateral_loss_m3 || 0)],
-        label: { show: true, position: 'inside', formatter: ({ value }) => fmtNumber(value, 0) }
-      }
-    ]
+    grid: { top: 30, left: 50, right: 30, bottom: 30 },
+    xAxis: { type: 'category', data: ['F1 损失', 'F2 流量差', 'F3 时间差'], axisLabel: { fontSize: 12 } },
+    yAxis: { type: 'value', name: '相对值', axisLabel: { fontSize: 11 } },
+    series: [{
+      type: 'bar', barWidth: '50%',
+      data: [
+        { value: vals[0] / mx, itemStyle: { color: '#5b8def' } },
+        { value: vals[1] / mx, itemStyle: { color: '#ef4444' } },
+        { value: vals[2] / mx, itemStyle: { color: '#f59e0b' } },
+      ],
+      label: { show: true, position: 'top', formatter: ({ value }) => value.toFixed(2) }
+    }]
   })
 }
 
-function renderBranchBar() {
-  branchBarChart = initChart(branchBarRef.value, branchBarChart)
-  if (!branchBarChart) return
-  const branches = result.value.branches || []
-  const series = []
-  if (branches.length) {
-    series.push({
-      name: '设计流量 qd',
-      type: 'bar',
-      itemStyle: { color: '#94a3b8' },
-      data: branches.map(b => Number(b.qd || 0))
-    })
-    series.push({
-      name: '实际流量 q',
-      type: 'bar',
-      itemStyle: { color: '#5b8def' },
-      data: branches.map(b => Number(b.q_actual || 0))
-    })
-    series.push({
-      name: '损失 m³',
-      type: 'line',
-      yAxisIndex: 1,
-      smooth: true,
-      symbol: 'circle',
-      symbolSize: 8,
-      lineStyle: { width: 2, color: '#ef4444' },
-      itemStyle: { color: '#ef4444' },
-      data: branches.map(b => Number(b.loss_m3 || 0))
+function renderBlLossPie() {
+  blLossPieChart = initChart(blLossPieRef.value, blLossPieChart)
+  if (!blLossPieChart) return
+  const s = blResult.value?.topsis_summary || {}
+  const data = [
+    { name: '支渠损失', value: Number(s.branch_loss_m3 || 0) },
+    { name: '斗渠损失', value: Number(s.lateral_loss_m3 || 0) },
+  ]
+  blLossPieChart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} m³ ({d}%)' },
+    legend: { bottom: 0, textStyle: { fontSize: 12 } },
+    series: [{
+      type: 'pie', radius: ['25%', '70%'], center: ['50%', '45%'],
+      itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+      label: { formatter: '{b}\n{d}%', fontSize: 11 },
+      data, color: ['#22c55e', '#f97316']
+    }]
+  })
+}
+
+function renderBlPareto() {
+  blParetoChart = initChart(blParetoRef.value, blParetoChart)
+  if (!blParetoChart) return
+  const data = blResult.value?.pareto || []
+  if (!data.length) return
+  const option = {
+    title: { text: 'Pareto 前沿（3D 散点）', left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'item', formatter: (p) => {
+      const d = p.data
+      return `F1=${d.value[0].toFixed(2)} m³<br/>F2=${d.value[1].toFixed(4)}<br/>F3=${d.value[2].toFixed(3)} h<br/>score=${d.value[3].toFixed(4)}${d.value[4] ? '<br/>★ TOPSIS 优选' : ''}`
+    }},
+    visualMap: {
+      show: true, dimension: 3,
+      min: Math.min(...data.map(d => d.score)),
+      max: Math.max(...data.map(d => d.score)),
+      orient: 'vertical', right: 10, top: 'center', calculable: true,
+      text: ['score', ''],
+      inRange: { color: ['#bfdfd2', '#53999d', '#ecb66b', '#ec8e5a'] }
+    },
+    xAxis3D: { name: 'F1: 输水损失 (m³)', type: 'value' },
+    yAxis3D: { name: 'F2: 流量差异', type: 'value' },
+    zAxis3D: { name: 'F3: 时间差异 (h)', type: 'value' },
+    grid3D: {
+      boxWidth: 110, boxDepth: 110,
+      viewControl: { projection: 'perspective', alpha: 20, beta: 30 },
+      light: { main: { intensity: 1.2 }, ambient: { intensity: 0.3 } }
+    },
+    series: [{
+      type: 'scatter3D', symbolSize: 12,
+      data: data.map(d => ({
+        value: [d.F1, d.F2, d.F3, d.score, d.selected],
+        itemStyle: d.selected ? { color: '#ec8e5a', borderColor: '#fff', borderWidth: 2 } : undefined
+      }))
+    }]
+  }
+  if (data.some(d => d.selected)) {
+    option.series.push({
+      type: 'scatter3D', symbolSize: 26, symbol: 'star',
+      data: data.filter(d => d.selected).map(d => ({ value: [d.F1, d.F2, d.F3, d.score, true] })),
+      itemStyle: { color: '#ec8e5a' }
     })
   }
-  branchBarChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-    legend: { top: 0, textStyle: { fontSize: 12 } },
-    grid: { top: 36, left: 60, right: 60, bottom: 30 },
-    xAxis: {
-      type: 'category',
-      data: branches.map(b => `支渠 ${b.name}`),
-      axisLabel: { fontSize: 11 }
-    },
-    yAxis: [
-      { type: 'value', name: 'm³/s', nameTextStyle: { fontSize: 11 } },
-      { type: 'value', name: '损失 m³', position: 'right', nameTextStyle: { fontSize: 11 } }
-    ],
-    series
-  })
+  blParetoChart.setOption(option)
 }
 
-function renderGroupGantt() {
-  groupGanttChart = initChart(groupGanttRef.value, groupGanttChart)
-  if (!groupGanttChart) return
-  const groups = (result.value.groups || []).slice().sort((a, b) => {
-    if (a.parent !== b.parent) return String(a.parent).localeCompare(String(b.parent))
-    return a.group - b.group
-  })
-  const rows = groups.map(g => ({
-    name: `${g.parent} · G${g.group}`,
-    t_start: Number(g.start_h || 0),
-    duration: Number(g.duration_h || 0),
-    group: g
-  }))
-  const yCategories = rows.map(r => r.name)
-  const series = rows.map((r, i) => ({
-    name: r.name,
-    type: 'custom',
-    renderItem: (params, api) => {
-      const ci = api.value(0)
-      const dur = api.value(1)
-      const start = api.value(2)
-      const end = start + dur
-      const y = api.coord([0, ci])
-      const x0 = api.coord([start, ci])
-      const x1 = api.coord([end, ci])
-      const height = api.size([0, 1])[1] * 0.55
-      return {
-        type: 'rect',
-        shape: { x: x0[0], y: y[1] - height / 2, width: Math.max(x1[0] - x0[0], 1), height },
-        style: { fill: r.group.group === 1 ? '#22c55e' : '#f59e0b', stroke: '#fff', lineWidth: 1 }
-      }
-    },
-    encode: { x: [1, 2], y: 0 },
-    data: [[i, r.duration, r.t_start]]
-  }))
-  groupGanttChart.setOption({
-    tooltip: {
-      trigger: 'item',
-      formatter: (p) => {
-        const g = rows[p.dataIndex].group
-        return `<b>${g.parent} · G${g.group}</b><br/>总流量 ${fmtNumber(g.total_flow, 2)} m³/s · 占比 ${fmtNumber(g.flow_ratio, 4)}<br/>开始 ${fmtNumber(g.start_h, 2)} h · 持续 ${fmtNumber(g.duration_h, 2)} h<br/>损失 ${fmtNumber(g.loss_m3, 0)} m³`
-      }
-    },
-    grid: { top: 30, left: 130, right: 30, bottom: 40 },
-    xAxis: { type: 'value', name: '时间 (h)', nameLocation: 'middle', nameGap: 25 },
-    yAxis: { type: 'category', data: yCategories, axisLabel: { fontSize: 11 } },
-    dataZoom: [
-      { type: 'inside', xAxisIndex: 0 },
-      { type: 'slider', xAxisIndex: 0, height: 18, bottom: 5 }
-    ],
-    series
-  })
-}
-
-function renderBranchGantts() {
-  const branches = result.value.branches || []
-  branches.forEach((b, idx) => {
-    const el = branchGanttRefs[idx]
-    if (!el) return
-    if (branchGanttCharts[idx]) branchGanttCharts[idx].dispose()
-    const chart = echarts.init(el)
-    branchGanttCharts[idx] = chart
-    const rows = getBranchLaterals(b.name)
-    if (!rows.length) {
-      chart.setOption({
-        title: { text: '无斗渠数据', left: 'center', top: 'middle' }
-      })
-      return
-    }
-    const yCategories = rows.map(r => r.name)
-    const series = rows.map((r, i) => ({
-      name: r.name,
-      type: 'custom',
-      renderItem: (params, api) => {
-        const ci = api.value(0)
-        const dur = api.value(1)
-        const start = api.value(2)
-        const end = start + dur
-        const y = api.coord([0, ci])
-        const x0 = api.coord([start, ci])
-        const x1 = api.coord([end, ci])
-        const height = api.size([0, 1])[1] * 0.55
-        return {
-          type: 'rect',
-          shape: { x: x0[0], y: y[1] - height / 2, width: Math.max(x1[0] - x0[0], 1), height },
-          style: {
-            fill: r.group === 1 ? '#22c55e' : '#f59e0b',
-            stroke: '#fff',
-            lineWidth: 1
-          }
-        }
-      },
-      encode: { x: [1, 2], y: 0 },
-      data: [[i, Number(r.duration_h || 0), Number(r.start_h || r.t_start_h || 0)]]
-    }))
-    chart.setOption({
-      tooltip: {
-        trigger: 'item',
-        formatter: (p) => {
-          const r = rows[p.dataIndex]
-          return `<b>${r.name} (G${r.group})</b><br/>设计 ${fmtNumber(r.Q_design, 2)} m³/s · 实际 ${fmtNumber(r.Q_actual, 3)} m³/s<br/>占比 ${fmtNumber(r.ratio, 4)}<br/>开始 ${fmtNumber(r.start_h, 2)} h · 持续 ${fmtNumber(r.duration_h, 2)} h<br/>损失 ${fmtNumber(r.loss_m3, 0)} m³`
-        }
-      },
-      grid: { top: 30, left: 100, right: 30, bottom: 40 },
-      xAxis: { type: 'value', name: '时间 (h)', nameLocation: 'middle', nameGap: 25 },
-      yAxis: { type: 'category', data: yCategories, axisLabel: { fontSize: 11 } },
-      dataZoom: [
-        { type: 'inside', xAxisIndex: 0 },
-        { type: 'slider', xAxisIndex: 0, height: 18, bottom: 5 }
-      ],
-      series
+function renderBlGantt() {
+  blGanttChart = initChart(blGanttRef.value, blGanttChart)
+  if (!blGanttChart) return
+  const groups = blResult.value?.groups || []
+  const laterals = blResult.value?.laterals || []
+  const rows = []
+  groups.forEach(g => {
+    rows.push({ name: `G${g.group} 轮灌组`, isGroup: true, t_start: Number(g.start_h || 0), duration: Number(g.duration_h || 0) })
+    const gLats = laterals.filter(l => l.group === g.group)
+    gLats.forEach(l => {
+      rows.push({ name: `  · ${l.name || l.Name}`, isLateral: true, t_start: Number(g.start_h || 0), duration: Number(l.duration_h || 0) })
     })
   })
+  const yCategories = rows.map(r => r.name)
+  const GROUP_COLORS = ['#22c55e', '#f59e0b', '#5b8def', '#ec4899', '#a855f7', '#14b8a6']
+  const series = rows.map((r, i) => ({
+    name: r.name, type: 'custom',
+    renderItem: (params, api) => {
+      const x0 = api.coord([r.t_start, i])[0]
+      const x1 = api.coord([r.t_start + r.duration, i])[0]
+      const y = api.coord([0, i])[1]
+      const height = api.size([0, 1])[1] * (r.isGroup ? 0.6 : 0.5)
+      const color = r.isGroup ? GROUP_COLORS[(parseInt(r.name.slice(1)) - 1) % GROUP_COLORS.length] : '#94a3b8'
+      return {
+        type: 'rect',
+        shape: { x: x0, y: y - height / 2, width: Math.max(x1 - x0, 1), height },
+        style: { fill: color, stroke: '#fff', lineWidth: 1 }
+      }
+    },
+    encode: { x: [0, 1], y: 0 },
+    data: [[r.t_start, r.duration, i]]
+  }))
+  blGanttChart.setOption({
+    tooltip: { trigger: 'item', formatter: (p) => {
+      const r = rows[p.dataIndex]
+      return `<b>${r.name}</b><br/>开始 ${fmtNumber(r.t_start, 2)} h · 持续 ${fmtNumber(r.duration, 2)} h`
+    }},
+    grid: { top: 30, left: 140, right: 30, bottom: 40 },
+    xAxis: { type: 'value', name: '时间 (h)', nameLocation: 'middle', nameGap: 25 },
+    yAxis: { type: 'category', data: yCategories, axisLabel: { fontSize: 11 } },
+    dataZoom: [{ type: 'inside', xAxisIndex: 0 }, { type: 'slider', xAxisIndex: 0, height: 18, bottom: 5 }],
+    series
+  })
 }
 
-watch(result, async (val) => {
+function renderBlLossBar() {
+  blLossBarChart = initChart(blLossBarRef.value, blLossBarChart)
+  if (!blLossBarChart) return
+  const laterals = blResult.value?.laterals || []
+  laterals.sort((a, b) => {
+    const na = a.name || a.Name || ''
+    const nb = b.name || b.Name || ''
+    const ma = na.match(/(\d+)$/)
+    const mb = nb.match(/(\d+)$/)
+    return (ma ? parseInt(ma[1]) : 0) - (mb ? parseInt(mb[1]) : 0)
+  })
+  const names = laterals.map(l => l.name || l.Name)
+  const losses = laterals.map(l => Number(l.loss_m3 || 0))
+  const colors = laterals.map((_, i) => COLOR_PALETTE[i % COLOR_PALETTE.length])
+  blLossBarChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { top: 30, left: 60, right: 30, bottom: 60 },
+    xAxis: { type: 'category', data: names, axisLabel: { fontSize: 11, rotate: 30 } },
+    yAxis: { type: 'value', name: 'm³', nameTextStyle: { fontSize: 11 } },
+    series: [{
+      type: 'bar', data: laterals.map((l, i) => ({
+        value: Number(l.loss_m3 || 0),
+        itemStyle: { color: colors[i], borderRadius: [4, 4, 0, 0] }
+      })),
+      label: { show: true, position: 'top', fontSize: 10, formatter: ({ value }) => fmtNumber(value, 0) }
+    }]
+  })
+}
+
+watch(activeResult, async (val) => {
   if (!val) return
   await nextTick()
-  renderAllCharts()
+  if (activeTab.value === 'trunk-branch') renderTrunkBranchCharts()
+  else renderBranchLateralCharts()
 })
 
 window.addEventListener('resize', () => {
   ;[
-    entropyChart, objectiveChart, lossPieChart, pareto2dChart,
-    paretoChart, fullGanttChart, timeSeriesChart, lossBarChart,
-    branchBarChart, groupGanttChart
+    tbEntropyChart, tbObjectiveChart, tbLossPieChart,
+    tbParetoChart, tbGanttChart, tbTimeSeriesChart,
+    blEntropyChart, blObjectiveChart, blLossPieChart,
+    blParetoChart, blGanttChart, blLossBarChart,
   ].forEach(c => { if (c) c.resize() })
-  branchGanttCharts.forEach(c => { if (c) c.resize() })
 })
 
-onUnmounted(() => {
-  destroyCharts()
-})
+onUnmounted(() => { destroyAllCharts() })
 </script>
 
 <style scoped>
-.canal-optimize-page {
-  padding-bottom: 28px;
-}
-
-.agri-page__siblings {
-  display: flex;
-  gap: 12px;
-  margin-top: 14px;
-  flex-wrap: wrap;
-}
-
-.sibling-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--surface-soft-bg);
-  border: 1px solid var(--hairline-color);
-  color: var(--text-primary);
-  font-size: 0.867em;
-  text-decoration: none;
-  transition: all 0.2s ease;
-}
-
-.sibling-link:hover {
-  background: var(--el-color-primary-light-9);
-  border-color: var(--el-color-primary-light-5);
-  color: var(--el-color-primary);
-}
-
-.page-layout {
-  align-items: stretch;
-}
-
-.db-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.muted-text {
-  color: var(--text-secondary);
-  font-size: 12px;
-  margin-left: 8px;
-}
-
-.divider-soft {
-  height: 1px;
-  margin: 6px 0 14px;
-  background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.25), transparent);
-}
-
-.subtree-preview {
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(14, 165, 233, 0.06);
-  border: 1px solid rgba(14, 165, 233, 0.15);
-}
-
-.subtree-preview__label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-.subtree-preview__levels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.mr6 {
-  margin-right: 6px;
-}
-
-.config-col {
-  display: flex;
-  min-width: 0;
-}
-
-.config-col .config-card {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  width: 100%;
-}
-
-.config-col .config-card :deep(.el-card__body) {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.config-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.result-col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.config-card,
-.chart-card {
-  border-radius: 20px;
-  border: 1px solid var(--hairline-color);
-  box-shadow: var(--content-shadow-soft);
-  overflow: hidden;
-}
-
-.card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.card-title {
-  font-size: 18px;
-  font-weight: 650;
-  color: var(--text-primary);
-}
-
-.card-desc {
-  margin-top: 6px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
-
-.chart-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.chart-title {
-  font-size: 1em;
-  font-weight: 650;
-  color: var(--text-primary);
-}
-
-.chart-sub {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.8em;
-  color: var(--text-secondary);
-}
-
-.chart-tags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.mb16 {
-  margin-bottom: 16px;
-}
-
-.mt12 {
-  margin-top: 12px;
-}
-
-.mt16 {
-  margin-top: 16px;
-}
-
-.opt-form :deep(.el-form-item) {
-  margin-bottom: 14px;
-}
-
-.opt-form :deep(.el-form-item__label) {
-  font-size: 0.8em;
-  color: var(--text-regular);
-  padding: 0 0 4px;
-  line-height: 1.3;
-  font-weight: 500;
-}
-
-.action-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.action-primary {
-  flex: 1;
-}
-
-.action-secondary {
-  flex: 0 0 auto;
-}
-
-.placeholder {
-  padding: 56px 20px;
-  text-align: center;
-  background: var(--surface-soft-bg);
-  border-radius: 20px;
-  border: 1px dashed var(--hairline-color);
-}
-
-.placeholder-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.placeholder-desc {
-  margin-top: 10px;
-  font-size: 0.867em;
-  line-height: 1.7;
-  color: var(--text-secondary);
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.chart {
-  width: 100%;
-  height: 320px;
-}
-
-.chart-tall {
-  height: 420px;
-}
-
-.chart-row {
-  margin-top: 16px;
-}
-
-.chart-row+.chart-row {
-  margin-top: 16px;
-}
-
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
-  margin-top: 16px;
-}
-
-.kpi-card {
-  position: relative;
-  padding: 18px 20px;
-  border-radius: 18px;
-  background: var(--surface-bg);
-  border: 1px solid var(--hairline-color);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.kpi-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 4px;
-  background: var(--el-color-primary);
-  opacity: 0.9;
-}
-
-.kpi-card--primary::before {
-  background: linear-gradient(90deg, #5b8def, #6366f1);
-}
-
-.kpi-card--danger::before {
-  background: linear-gradient(90deg, #ef4444, #f97316);
-}
-
-.kpi-card--warning::before {
-  background: linear-gradient(90deg, #f59e0b, #facc15);
-}
-
-.kpi-card--success::before {
-  background: linear-gradient(90deg, #22c55e, #14b8a6);
-}
-
-.kpi-card--info::before {
-  background: linear-gradient(90deg, #06b6d4, #0ea5e9);
-}
-
-.kpi-card--purple::before {
-  background: linear-gradient(90deg, #a855f7, #ec4899);
-}
-
-.kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-}
-
-.kpi-label {
-  font-size: 0.867em;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.kpi-value {
-  margin-top: 8px;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.1;
-}
-
-.kpi-unit {
-  margin-left: 4px;
-  font-size: 0.933em;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.kpi-foot {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.lateral-table {
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-@media (max-width: 1200px) {
-  .chart {
-    height: 300px;
-  }
-
-  .chart-tall {
-    height: 380px;
-  }
-}
-
-@media (max-width: 992px) {
-  .config-col {
-    display: block;
-  }
-
-  .config-body {
-    max-height: none;
-    overflow: visible;
-  }
-}
-
-@media (max-width: 768px) {
-  .kpi-value {
-    font-size: 22px;
-  }
-
-  .chart {
-    height: 280px;
-  }
-
-  .chart-tall {
-    height: 340px;
-  }
-}
+.canal-optimize-page { padding-bottom: 28px; }
+.agri-page__siblings { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.sibling-link { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--surface-soft-bg); border: 1px solid var(--hairline-color); color: var(--text-primary); font-size: 0.867em; text-decoration: none; transition: all 0.2s ease; }
+.sibling-link:hover { background: var(--el-color-primary-light-9); border-color: var(--el-color-primary-light-5); color: var(--el-color-primary); }
+.page-layout { align-items: stretch; }
+.db-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.muted-text { color: var(--text-secondary); font-size: 12px; margin-left: 8px; }
+.divider-soft { height: 1px; margin: 6px 0 14px; background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.25), transparent); }
+.subtree-preview { padding: 8px 12px; border-radius: 8px; background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.15); }
+.subtree-preview__label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.subtree-preview__levels { display: flex; flex-wrap: wrap; gap: 4px; }
+.mr6 { margin-right: 6px; }
+.mode-tabs :deep(.el-tabs__header) { margin-bottom: 0; }
+.mode-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
+.mt8 { margin-top: 8px; }
+.config-col { display: flex; min-width: 0; }
+.config-col .config-card { display: flex; flex-direction: column; flex: 1 1 auto; width: 100%; }
+.config-col .config-card :deep(.el-card__body) { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.config-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
+.result-col { display: flex; flex-direction: column; min-width: 0; }
+.config-card, .chart-card { border-radius: 20px; border: 1px solid var(--hairline-color); box-shadow: var(--content-shadow-soft); overflow: hidden; }
+.card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.card-title { font-size: 18px; font-weight: 650; color: var(--text-primary); }
+.card-desc { margin-top: 6px; color: var(--text-secondary); line-height: 1.6; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.chart-title { font-size: 1em; font-weight: 650; color: var(--text-primary); }
+.chart-sub { display: block; margin-top: 4px; font-size: 0.8em; color: var(--text-secondary); }
+.chart-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.mb12 { margin-bottom: 12px; }
+.mt16 { margin-top: 16px; }
+.opt-form :deep(.el-form-item) { margin-bottom: 14px; }
+.opt-form :deep(.el-form-item__label) { font-size: 0.8em; color: var(--text-regular); padding: 0 0 4px; line-height: 1.3; font-weight: 500; }
+.action-row { display: flex; gap: 10px; margin-top: 12px; }
+.action-primary { flex: 1; }
+.action-secondary { flex: 0 0 auto; }
+.placeholder { padding: 56px 20px; text-align: center; background: var(--surface-soft-bg); border-radius: 20px; border: 1px dashed var(--hairline-color); }
+.placeholder-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.placeholder-desc { margin-top: 10px; font-size: 0.867em; line-height: 1.7; color: var(--text-secondary); max-width: 600px; margin-left: auto; margin-right: auto; }
+.chart { width: 100%; height: 320px; }
+.chart-tall { height: 420px; }
+.chart-row { margin-top: 16px; }
+.chart-row + .chart-row { margin-top: 16px; }
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 16px; }
+.kpi-box { padding: 18px 20px; border-radius: 18px; background: var(--surface-bg); border: 1px solid var(--hairline-color); box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05); overflow: hidden; }
+.kpi-label { font-size: 0.867em; color: var(--text-secondary); font-weight: 500; }
+.kpi-value { margin-top: 8px; font-size: 28px; font-weight: 700; color: var(--text-primary); line-height: 1.1; }
+.kpi-unit { margin-left: 4px; font-size: 0.933em; font-weight: 500; color: var(--text-secondary); }
+.kpi-foot { margin-top: 8px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.error-box { padding: 16px; }
+@media (max-width: 1200px) { .chart { height: 300px; } .chart-tall { height: 380px; } }
+@media (max-width: 992px) { .config-col { display: block; } .config-body { max-height: none; overflow: visible; } }
+@media (max-width: 768px) { .kpi-value { font-size: 22px; } .chart { height: 280px; } .chart-tall { height: 340px; } }
 </style>

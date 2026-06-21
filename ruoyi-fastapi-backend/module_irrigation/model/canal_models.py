@@ -1,8 +1,5 @@
 """
 渠系模型核心：梯形断面水力工具与静态校核。
-
-全灌区常量（重力 g、Manning 糙率默认、闸门默认）由本文件集中导出，
-单渠段/全渠系水动力学仿真由 `module_irrigation.model.canal_full_hydro` 提供。
 """
 
 from __future__ import annotations

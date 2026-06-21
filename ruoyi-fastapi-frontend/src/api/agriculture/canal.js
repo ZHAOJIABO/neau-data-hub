@@ -21,15 +21,6 @@ function unwrap(response) {
     : response
 }
 
-export async function runSubtreeHydro(payload, apiKey = IRRIGATION_API_KEY) {
-  const response = await request({
-    url: '/api/v1/irrigation/canal/hydro/subtree/standard',
-    method: 'post',
-    data: payload,
-    ...buildRequestConfig(apiKey)
-  })
-  return unwrap(response)
-}
 
 // ---------------------------------------------------------------------------
 // 渠系数据管理（农业数据）
@@ -103,3 +94,36 @@ export async function runFullOptimize(payload, apiKey = IRRIGATION_API_KEY) {
   return unwrap(response)
 }
 
+export async function runTrunkBranchOptimize(payload, apiKey = IRRIGATION_API_KEY) {
+  const response = await request({
+    url: '/api/v1/irrigation/canal/optimize/trunk-branch',
+    method: 'post',
+    data: payload,
+    ...buildRequestConfig(apiKey)
+  })
+  return unwrap(response)
+}
+
+export async function runBranchLateralOptimize(payload, apiKey = IRRIGATION_API_KEY) {
+  const response = await request({
+    url: '/api/v1/irrigation/canal/optimize/branch-lateral',
+    method: 'post',
+    data: payload,
+    ...buildRequestConfig(apiKey)
+  })
+  return unwrap(response)
+}
+
+// ---------------------------------------------------------------------------
+// Kinematic Wave 水动力学仿真
+// ---------------------------------------------------------------------------
+
+export async function runKinematicSim(payload, apiKey = IRRIGATION_API_KEY) {
+  const response = await request({
+    url: '/api/v1/irrigation/canal/hydro/kinematic',
+    method: 'post',
+    data: payload,
+    ...buildRequestConfig(apiKey)
+  })
+  return unwrap(response)
+}

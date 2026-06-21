@@ -54,18 +54,17 @@
         <el-table-column type="selection" width="50" align="center" />
         <el-table-column label="渠段编号" prop="canalId" min-width="120" show-overflow-tooltip />
         <el-table-column label="名称" prop="canalName" min-width="180" show-overflow-tooltip />
-        <el-table-column label="级别" prop="level" min-width="180" show-overflow-tooltip />
+        <el-table-column label="级别" prop="level" min-width="80" />
         <el-table-column label="长度 m" prop="length" min-width="100" align="right" />
         <el-table-column label="设计流量 m³/s" prop="designFlow" min-width="120" align="right" />
-        <el-table-column label="设计水深 m" prop="designDepth" min-width="110" align="right" />
-        <el-table-column label="闸门" min-width="100" align="center">
-          <template #default="scope">
-            <el-tag :type="(scope.row.gateHeight && scope.row.gateWidth) ? 'success' : 'info'" size="small">
-              {{ (scope.row.gateHeight && scope.row.gateWidth) ? '有闸' : '无闸' }}
-            </el-tag>
-          </template>
-        </el-table-column>
+        <el-table-column label="渠底宽 m" prop="bottomWidth" min-width="100" align="right" />
+        <el-table-column label="坡降" prop="slope" min-width="100" align="right" />
+        <el-table-column label="边坡" prop="sideSlope" min-width="80" align="right" />
+        <el-table-column label="糙率" prop="roughness" min-width="80" align="right" />
         <el-table-column label="需水量 m³" prop="waterDemand" min-width="130" align="right" />
+        <el-table-column label="桩号 m" prop="position" min-width="100" align="right" />
+        <el-table-column label="纬度" prop="latitude" min-width="100" align="right" />
+        <el-table-column label="经度" prop="longitude" min-width="100" align="right" />
         <el-table-column label="更新时间" prop="updatedAt" min-width="160" />
         <el-table-column label="操作" width="160" align="center" fixed="right">
           <template #default="scope">
@@ -105,6 +104,11 @@
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
+            <el-form-item label="父渠段" prop="parentId">
+              <el-input v-model="form.parentId" placeholder="如 1-1" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
             <el-form-item label="级别" prop="level">
               <el-select v-model="form.level" placeholder="选择级别" clearable style="width: 100%">
                 <el-option label="1 干渠" value="1" />
@@ -125,22 +129,12 @@
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="设计水深 (m)" prop="designDepth">
-              <el-input-number v-model="form.designDepth" :min="0" :precision="4" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="设计渠顶宽 (m)" prop="topWidth">
-              <el-input-number v-model="form.topWidth" :min="0" :precision="4" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="设计渠底宽 (m)" prop="bottomWidth">
+            <el-form-item label="渠底宽 (m)" prop="bottomWidth">
               <el-input-number v-model="form.bottomWidth" :min="0" :precision="4" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="设计纵坡" prop="slope">
+            <el-form-item label="坡降" prop="slope">
               <el-input-number v-model="form.slope" :min="0" :precision="10" style="width: 100%" />
             </el-form-item>
           </el-col>
@@ -155,28 +149,23 @@
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="闸门高度 (m)" prop="gateHeight">
-              <el-input-number v-model="form.gateHeight" :min="0" :precision="4" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="闸门宽度 (m)" prop="gateWidth">
-              <el-input-number v-model="form.gateWidth" :min="0" :precision="4" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="最小开度 (m)" prop="minGateOpening">
-              <el-input-number v-model="form.minGateOpening" :min="0" :precision="4" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="最大开度 (m)" prop="maxGateOpening">
-              <el-input-number v-model="form.maxGateOpening" :min="0" :precision="4" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
             <el-form-item label="需水量 (m³)" prop="waterDemand">
               <el-input-number v-model="form.waterDemand" :min="0" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="桩号 (m)" prop="position">
+              <el-input-number v-model="form.position" :min="0" :precision="3" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="纬度" prop="latitude">
+              <el-input-number v-model="form.latitude" :precision="8" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="经度" prop="longitude">
+              <el-input-number v-model="form.longitude" :precision="8" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -195,7 +184,7 @@
         type="info"
         :closable="false"
         show-icon
-        title="支持标准渠系 CSV 格式（包含 Channel No. / Channel Name / Length(m) / Design Flow(m³/s) 等列）。按 canal_id 唯一键 upsert，重复行会被更新。"
+        title="支持 canal.csv 标准格式（canal_id / canal_name / parent_id / level / length / design_flow / bottom_width / slope / side_slope / roughness / water_demand / position / latitude / longitude）。按 canal_id 唯一键 upsert，重复行会被更新。"
         class="mb16"
       />
       <el-upload
@@ -255,20 +244,18 @@ const dialogTitle = ref('新增渠系')
 const form = reactive({
   canalId: '',
   canalName: '',
+  parentId: '',
   level: '',
   length: 0,
   designFlow: 0,
-  designDepth: 0,
-  topWidth: 0,
   bottomWidth: 0,
   slope: 0.0002,
   sideSlope: 1.5,
   roughness: 0.015,
-  gateHeight: 0,
-  gateWidth: 0,
-  minGateOpening: 0,
-  maxGateOpening: 1.0,
-  waterDemand: 0
+  waterDemand: 0,
+  position: 0,
+  latitude: 0,
+  longitude: 0
 })
 const formRules = reactive({
   canalId: [{ required: true, message: '请输入渠段编号', trigger: 'blur' }]
@@ -283,20 +270,18 @@ function resetForm() {
   Object.assign(form, {
     canalId: '',
     canalName: '',
+    parentId: '',
     level: '',
     length: 0,
     designFlow: 0,
-    designDepth: 0,
-    topWidth: 0,
     bottomWidth: 0,
     slope: 0.0002,
     sideSlope: 1.5,
     roughness: 0.015,
-    gateHeight: 0,
-    gateWidth: 0,
-    minGateOpening: 0,
-    maxGateOpening: 1.0,
-    waterDemand: 0
+    waterDemand: 0,
+    position: 0,
+    latitude: 0,
+    longitude: 0
   })
 }
 
@@ -346,20 +331,18 @@ function handleUpdate(row) {
   Object.assign(form, {
     canalId: row.canalId,
     canalName: row.canalName,
-    level: row.level,
+    parentId: row.parentId || '',
+    level: row.level || '',
     length: Number(row.length ?? 0),
     designFlow: Number(row.designFlow ?? 0),
-    designDepth: Number(row.designDepth ?? 0),
-    topWidth: Number(row.topWidth ?? 0),
     bottomWidth: Number(row.bottomWidth ?? 0),
     slope: Number(row.slope ?? 0.0002),
     sideSlope: Number(row.sideSlope ?? 1.5),
     roughness: Number(row.roughness ?? 0.015),
-    gateHeight: Number(row.gateHeight ?? 0),
-    gateWidth: Number(row.gateWidth ?? 0),
-    minGateOpening: Number(row.minGateOpening ?? 0),
-    maxGateOpening: Number(row.maxGateOpening ?? 1.0),
-    waterDemand: Number(row.waterDemand ?? 0)
+    waterDemand: Number(row.waterDemand ?? 0),
+    position: Number(row.position ?? 0),
+    latitude: Number(row.latitude ?? 0),
+    longitude: Number(row.longitude ?? 0)
   })
   formOpen.value = true
 }

@@ -32,7 +32,7 @@
 | `design_depth` | number | 是 | 设计水深，单位 m |
 | `top_width` | number | 否 | 设计渠顶宽，单位 m |
 | `bottom_width` | number | 是 | 设计渠底宽，单位 m |
-| `slope` | number | 是 | 设计纵坡，如 `0.0002` |
+| `slope` | number | 是 | 坡降，如 `0.0002` |
 | `side_slope` | number | 是 | 边坡系数 `1:m` 中的 m |
 | `roughness` | number | 是 | Manning 糙率 |
 | `gate_height` | number | 否 | 闸门高度，单位 m |
