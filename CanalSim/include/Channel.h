@@ -12,8 +12,15 @@ struct ChannelConfig {
     double m = 1.5;
     double n_Manning = 0.013;
     double S0 = 0.0001;
-    double Q_upstream = 50.0;
+    double Q_upstream = 10.0;
     double A_inflow = 0.0;
+    // 上游时序流量（优先于 Q_upstream）
+    std::vector<double> Q_upstream_series;
+    std::vector<double> t_series;
+    // 下游水位-流量关系曲线
+    bool use_rating_curve = false;
+    std::vector<double> y_ds_curve;
+    std::vector<double> Q_ds_curve;
     double dx;
     double g = 9.81;
     double A_wet_min = 0.1;  // 湿地面积下限 (m²); 下游零流区域保持此最小底水深
@@ -52,6 +59,7 @@ public:
     double getWettedPerimeter(double y) const;
     double solveYfromA(double A_target) const;
     double normalDepth(double Q) const;
+    double interpolateSeries(double x, const std::vector<double>& x_series, const std::vector<double>& y_series) const;
 
     int nx;
     std::vector<Cell> cells;

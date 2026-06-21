@@ -12,13 +12,11 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import tempfile
-import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
-
-import numpy as np
 
 from utils.log_util import logger
 
@@ -56,29 +54,91 @@ class CanalSimInput:
     max_iterations: int = 100
     A_wet_min: float = 0.1
     Q_initial: float = 0.0
+    theta: float = 0.5
     branches: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
+        ch: dict[str, Any] = {
+            'L': self.L,
+            'nx': self.nx,
+            'b': self.b,
+            'm': self.m,
+            'n_Manning': self.n_Manning,
+            'S0': self.S0,
+            'tf': self.tf,
+            'dt': self.dt,
+            'A_wet_min': self.A_wet_min,
+            'Q_initial': self.Q_initial,
+            'g': 9.81,
+        }
+        # Rating curve downstream BC
+        if getattr(self, 'use_rating_curve', False):
+            ch['use_rating_curve'] = True
+            ch['y_ds_curve'] = getattr(self, 'y_ds_curve', [])
+            ch['Q_ds_curve'] = getattr(self, 'Q_ds_curve', [])
+            ch['Q_upstream'] = self.Q_upstream
+        elif getattr(self, 'Q_upstream_series', None):
+            ch['Q_upstream_series'] = self.Q_upstream_series
+            ch['t_series'] = getattr(self, 't_series', [])
+            ch['Q_upstream'] = self.Q_upstream
+        else:
+            ch['Q_upstream'] = self.Q_upstream
+
         return {
-            'channel': {
-                'L': self.L,
-                'nx': self.nx,
-                'b': self.b,
-                'm': self.m,
-                'n_Manning': self.n_Manning,
-                'S0': self.S0,
-                'Q_upstream': self.Q_upstream,
-                'tf': self.tf,
-                'dt': self.dt,
-                'A_wet_min': self.A_wet_min,
-                'Q_initial': self.Q_initial,
-            },
+            'channel': ch,
             'solver': {
+                'theta': getattr(self, 'theta', 0.5),
                 'tolerance': self.tolerance,
                 'max_iterations': self.max_iterations,
             },
             'branches': self.branches,
         }
+
+
+def _area_topwidth(y: float, b: float, m: float) -> tuple[float, float]:
+    A = (b + m * y) * y
+    P = b + 2 * y * math.sqrt(1 + m * m)
+    return A, P
+
+
+def _manning_normal_depth(Q: float, b: float, m: float, n: float, S0: float) -> float:
+    if Q <= 0 or n <= 0 or S0 <= 0:
+        return 0.1
+    lo, hi = 0.001, 50.0
+    for _ in range(80):
+        mid = (lo + hi) / 2
+        A, _ = _area_topwidth(mid, b, m)
+        P = b + 2 * mid * math.sqrt(1 + m * m)
+        R = A / P
+        Qmid = A * math.pow(R, 2 / 3) * math.sqrt(S0) / n
+        (lo := mid) if Qmid < Q else (hi := mid)
+    return (lo + hi) / 2
+
+
+def _generate_manning_rating_curve(
+    b: float, m: float, n_Manning: float, S0: float, n_points: int = 20
+) -> tuple[list[float], list[float]]:
+    """用 Manning 公式自动生成下游 Q-y 曲线。"""
+    if S0 <= 0 or n_Manning <= 0 or b <= 0:
+        return [], []
+
+    # 以设计流量 Q=10 m³/s 估算正常水深作为参考
+    y0 = _manning_normal_depth(Q_upstream, b, m, n_Manning, S0)
+    y_max = max(2.5 * y0, 0.5)
+    Sf = math.sqrt(S0)
+
+    ys, qs = [], []
+    step = (y_max - 0.05) / max(n_points - 1, 1)
+    for i in range(n_points):
+        y = round(0.05 + i * step, 4)
+        A, _ = _area_topwidth(y, b, m)
+        P = b + 2 * y * math.sqrt(1 + m * m)
+        R = A / P
+        Q = round(A * math.pow(R, 2 / 3) * Sf / n_Manning, 4)
+        ys.append(y)
+        qs.append(Q)
+
+    return ys, qs
 
 
 # ============================================================================
@@ -103,6 +163,11 @@ def run_canal_sim_exe(
     A_wet_min: float = 0.1,
     Q_upstream_series: Optional[list[tuple[float, float]]] = None,
     canal_id: str = 'unknown',
+    theta: float = 0.5,
+    Q_initial: Optional[float] = None,
+    use_rating_curve: bool = False,
+    y_ds_curve: Optional[list[float]] = None,
+    Q_ds_curve: Optional[list[float]] = None,
 ) -> dict[str, Any]:
     """
     调用 canalsim.exe 执行 Kinematic Wave 水动力学仿真。
@@ -120,15 +185,15 @@ def run_canal_sim_exe(
         branches:         分水口列表 [{"x_position", "Q_offtake", "spread_cells"}]
         tolerance:        Picard 迭代收敛容差
         max_iterations:   最大迭代次数
-        output_interval_sec: 输出时间分辨率 (s)（保留，当前 exe 输出每个 dt）
+        output_interval_sec: 输出时间分辨率 (s)
         A_wet_min:        最小过水面积
-        Q_upstream_series: 上游流量时序 [(t_sec, Q_m3s), ...]
-                           如果只含 1 个点，使用该流量做稳态仿真；
-                           如果多个点，按时间段分段执行 exe，每次取对应区间的平均流量，
-                           最后合并时空结果（取各段末尾快照拼接）。
-                           注意：canalsim.exe 自身不支持非恒定流入过程，此处通过
-                           分段仿真近似。
+        Q_upstream_series: 上游流量时序 [(t_sec, Q_m3s), ...]；exe 自身支持
         canal_id:          渠段编号（仅用于日志）
+        theta:             迎风因子，默认 0.5（直接传给 exe solver）
+        Q_initial:         初始均匀流流量，默认 Q_upstream
+        use_rating_curve:  启用下游水位-流量关系曲线
+        y_ds_curve:        下游水位曲线（m）
+        Q_ds_curve:        下游流量曲线（m³/s）
 
     返回:
         dict，与 KinematicWaveResult.to_dict() 结构一致：
@@ -142,242 +207,44 @@ def run_canal_sim_exe(
         }
     """
     branches = branches or []
+    y_ds_curve = y_ds_curve or []
+    Q_ds_curve = Q_ds_curve or []
+    effective_Q_initial = Q_initial if Q_initial is not None else Q_upstream
 
     # -------------------------------------------------------------------------
-    # 预处理 inflow_series
+    # 构建 CanalSimInput：exe 支持 Q_upstream_series 和 rating_curve 原生
     # -------------------------------------------------------------------------
-    if Q_upstream_series and len(Q_upstream_series) > 1:
-        # 多时段非恒定流：按时间段分段执行 exe
-        return _run_transient_via_exe_segments(
-            L=L, nx=nx, b=b, m=m, n_Manning=n_Manning, S0=S0,
-            tf=tf, dt=dt, branches=branches, tolerance=tolerance,
-            max_iterations=max_iterations, A_wet_min=A_wet_min,
-            Q_upstream_series=Q_upstream_series, canal_id=canal_id,
-        )
-
-    # -------------------------------------------------------------------------
-    # 稳态（单流量 or 常数 Q_upstream）：单次 exe 调用
-    # -------------------------------------------------------------------------
-    # inflow_series 为空或只有 1 个点 → 取第一个点的流量
-    effective_Q = Q_upstream
-    if Q_upstream_series and len(Q_upstream_series) == 1:
-        effective_Q = Q_upstream_series[0][1]
-
     sim_input = CanalSimInput(
         L=L, nx=nx, b=b, m=m, n_Manning=n_Manning, S0=S0,
-        Q_upstream=effective_Q, tf=tf, dt=dt,
+        Q_upstream=Q_upstream, Q_initial=effective_Q_initial,
+        tf=tf, dt=dt,
         tolerance=tolerance, max_iterations=max_iterations,
         A_wet_min=A_wet_min, branches=list(branches),
+        theta=theta,
     )
+    # 注入非恒定流入或 rating curve
+    if Q_upstream_series:
+        sim_input.Q_upstream_series = [q for _, q in Q_upstream_series]
+        sim_input.t_series = [t for t, _ in Q_upstream_series]
+    if use_rating_curve and y_ds_curve and Q_ds_curve:
+        sim_input.use_rating_curve = True
+        sim_input.y_ds_curve = y_ds_curve
+        sim_input.Q_ds_curve = Q_ds_curve
+    elif use_rating_curve and (not y_ds_curve or not Q_ds_curve):
+        # 前端仅传了 flag 未传曲线，自动用 Manning 生成兜底
+        auto_y, auto_Q = _generate_manning_rating_curve(b, m, n_Manning, S0)
+        sim_input.use_rating_curve = True
+        sim_input.y_ds_curve = auto_y
+        sim_input.Q_ds_curve = auto_Q
+        logger.info(
+            'rating_curve auto-generated: %d points, y=[%.4f, %.4f], Q=[%.4f, %.4f]',
+            len(auto_y), auto_y[0], auto_y[-1], auto_Q[0], auto_Q[-1],
+        )
 
     result_json = _call_exe(sim_input, canal_id=canal_id)
     return _map_exe_output_to_result(
         result_json, sim_input, output_interval_sec=output_interval_sec,
     )
-
-
-def _run_transient_via_exe_segments(
-    L: float, nx: int, b: float, m: float, n_Manning: float, S0: float,
-    tf: float, dt: float, branches: list[dict], tolerance: float,
-    max_iterations: int, A_wet_min: float,
-    Q_upstream_series: list[tuple[float, float]],
-    canal_id: str,
-) -> dict[str, Any]:
-    """
-    非恒定流入流时分段执行 canalsim.exe，结果拼接合并。
-
-    策略：每个时序拐点作为一个分段的起点，分段长度 = t_{i+1} - t_i。
-    每个分段的初始条件 = 前一分段的最终状态（水深、流量）。
-    最后返回完整时空矩阵（所有分段的水深/流量时空快照按时间拼接）。
-    """
-    import math
-
-    # 按时间排序
-    pts = sorted(Q_upstream_series, key=lambda p: p[0])
-
-    # 初始化：均匀流
-    def _normal_depth(Q: float) -> float:
-        Sf = math.sqrt(S0)
-        def residual(h: float) -> float:
-            A = (b + m * h) * h
-            P = b + 2.0 * h * math.sqrt(1.0 + m * m)
-            R = A / P if P > 1e-9 else 1e-9
-            return (A * (R ** (2.0 / 3.0)) / n_Manning) * Sf - Q
-        lo, hi = 1e-4, 50.0
-        if residual(lo) > 0:
-            return lo
-        if residual(hi) < 0:
-            return hi
-        for _ in range(80):
-            mid = 0.5 * (lo + hi)
-            r = residual(mid)
-            if r > 0:
-                hi = mid
-            else:
-                lo = mid
-            if hi - lo < 1e-6:
-                break
-        return 0.5 * (lo + hi)
-
-    h_init = _normal_depth(pts[0][1])
-    h_current = np.full(nx, max(h_init, 0.01), dtype=np.float64)
-    Q_current = np.full(nx, pts[0][1], dtype=np.float64)
-
-    # 收集所有段的水深/流量时空快照
-    all_spacetime_times: list[float] = []
-    all_spacetime_water_level: list[list[float]] = []
-    all_spacetime_flow_rate: list[list[float]] = []
-
-    # 全时刻 timeseries
-    all_t: list[float] = []
-    all_Q_up: list[float] = []
-    all_Q_down: list[float] = []
-    all_y_up: list[float] = []
-    all_y_down: list[float] = []
-
-    dx = L / (nx - 1)
-    x_grid = np.linspace(0, L, nx)
-
-    seg_idx = 0
-    while seg_idx < len(pts) - 1:
-        t_start, Q_start = pts[seg_idx]
-        t_end, Q_end = pts[seg_idx + 1]
-        seg_tf = t_end - t_start
-
-        if seg_tf <= 0:
-            seg_idx += 1
-            continue
-
-        # 如果初始状态已经干了，用正常水深恢复
-        h_current = np.maximum(h_current, 0.01)
-        Q_current = np.maximum(Q_current, 0.0)
-
-        # 分段出口断面流量受分水影响后的参考值（简化处理：取当前流量）
-        Q_seg = Q_start
-
-        # 注意：canalsim.exe 内部按 Q_upstream=常数执行，
-        # 不支持从任意初始水深出发重新启动。
-        # 因此本函数退化为：用各段平均流量近似，每段出口流量按分水比例递减。
-        # 实际上这里我们仍然执行 exe，但用当前段的代表流量；
-        # 结果仅作为示意。真正支持瞬变流需要扩展 exe 本身。
-        seg_input = CanalSimInput(
-            L=L, nx=nx, b=b, m=m, n_Manning=n_Manning, S0=S0,
-            Q_upstream=Q_seg, tf=seg_tf, dt=dt,
-            tolerance=tolerance, max_iterations=max_iterations,
-            A_wet_min=A_wet_min, branches=list(branches),
-            Q_initial=Q_seg,
-        )
-
-        try:
-            seg_result = _call_exe(seg_input, canal_id=f'{canal_id}_seg{seg_idx}')
-        except RuntimeError as exc:
-            logger.warning(
-                'transient segment %d failed (%s), skipping: t=[%.1f, %.1f]',
-                seg_idx, exc, t_start, t_end,
-            )
-            seg_idx += 1
-            continue
-
-        # 拼接时空快照（时间偏移 t_start）
-        seg_times = seg_result.get('spacetime', {}).get('times', [])
-        seg_water = seg_result.get('spacetime', {}).get('water_level_matrix', [])
-        seg_flow = seg_result.get('spacetime', {}).get('flow_rate_matrix', [])
-
-        for ti, t_abs in enumerate(seg_times):
-            if t_abs + t_start not in all_spacetime_times:
-                all_spacetime_times.append(t_abs + t_start)
-                all_spacetime_water_level.append(seg_water[ti] if ti < len(seg_water) else [])
-                all_spacetime_flow_rate.append(seg_flow[ti] if ti < len(seg_flow) else [])
-
-        # 拼接 timeseries
-        seg_ts = seg_result.get('timeseries', {})
-        for ti, t_abs in enumerate(seg_ts.get('t', [])):
-            all_t.append(t_abs + t_start)
-            all_Q_up.append(seg_ts['Q_upstream'][ti] if ti < len(seg_ts['Q_upstream']) else 0.0)
-            all_Q_down.append(seg_ts['Q_downstream'][ti] if ti < len(seg_ts['Q_downstream']) else 0.0)
-            all_y_up.append(seg_ts['y_upstream'][ti] if ti < len(seg_ts['y_upstream']) else 0.0)
-            all_y_down.append(seg_ts['y_downstream'][ti] if ti < len(seg_ts['y_downstream']) else 0.0)
-
-        # 更新初始条件（取段末状态）
-        final_state = seg_result.get('final_state', {})
-        y_list = final_state.get('y', [])
-        Q_list = final_state.get('Q', [])
-        if y_list:
-            h_current = np.array(y_list[-nx:], dtype=np.float64)
-            if len(h_current) < nx:
-                h_current = np.full(nx, h_current[-1] if len(h_current) > 0 else 0.01)
-        if Q_list:
-            Q_current = np.array(Q_list[-nx:], dtype=np.float64)
-            if len(Q_current) < nx:
-                Q_current = np.full(nx, Q_current[-1] if len(Q_current) > 0 else 0.0)
-
-        seg_idx += 1
-
-    # -------------------------------------------------------------------------
-    # 合并 final_state（取最后一段的最终状态）
-    # -------------------------------------------------------------------------
-    final_state_dict: dict[str, Any] = {
-        'x': x_grid.tolist(),
-        'y': h_current.tolist(),
-        'A': [],
-        'Q': Q_current.tolist(),
-        'V': [],
-        'Fr': [],
-    }
-    # 重新计算 A, V, Fr
-    for i in range(nx):
-        h_i = h_current[i]
-        A_i = (b + m * h_i) * h_i
-        T_i = b + 2.0 * m * h_i
-        P_i = b + 2.0 * h_i * math.sqrt(1.0 + m * m)
-        R_i = A_i / P_i if P_i > 1e-9 else 1e-9
-        V_i = Q_current[i] / A_i if A_i > 1e-9 else 0.0
-        Fr_i = V_i / math.sqrt(9.81 * A_i / T_i) if A_i > 1e-9 else 0.0
-        final_state_dict['A'].append(float(A_i))
-        final_state_dict['V'].append(float(V_i))
-        final_state_dict['Fr'].append(float(Fr_i))
-
-    total_offtake = sum(float(br.get('Q_offtake', 0.0)) for br in branches)
-
-    return {
-        'channel': {
-            'L': L, 'nx': nx, 'dx': dx,
-            'b': b, 'm': m, 'n_Manning': n_Manning,
-            'S0': S0, 'Q_upstream': Q_upstream_series[-1][1] if Q_upstream_series else 0.0,
-            'tf': tf, 'dt': dt,
-        },
-        'summary': {
-            'Q_upstream': Q_upstream_series[-1][1] if Q_upstream_series else 0.0,
-            'Q_downstream_final': float(Q_current[-1]) if len(Q_current) > 0 else 0.0,
-            'y_upstream_final': float(h_current[0]) if len(h_current) > 0 else 0.0,
-            'y_downstream_final': float(h_current[-1]) if len(h_current) > 0 else 0.0,
-            'total_offtake_m3s': total_offtake,
-        },
-        'timeseries': {
-            't': all_t,
-            'Q_upstream': all_Q_up,
-            'Q_downstream': all_Q_down,
-            'y_upstream': all_y_up,
-            'y_downstream': all_y_down,
-        },
-        'final_state': final_state_dict,
-        'spacetime': {
-            'times': all_spacetime_times,
-            'water_level_matrix': all_spacetime_water_level,
-            'flow_rate_matrix': all_spacetime_flow_rate,
-            'nx': nx,
-            'n_steps': len(all_spacetime_times),
-        },
-        'branches': [
-            {
-                'id': br.get('id', f'branch_{i}'),
-                'x_position': float(br.get('x_position', 0.0)),
-                'Q_offtake': float(br.get('Q_offtake', 0.0)),
-                'spread_cells': int(br.get('spread_cells', 0)),
-            }
-            for i, br in enumerate(branches)
-        ],
-    }
 
 
 # ============================================================================
@@ -507,35 +374,38 @@ def _map_exe_output_to_result(
     branches_out = exe_output.get('branches', [])
 
     dx = ch.get('dx', sim_input.L / (sim_input.nx - 1))
-
-    # canalsim.exe 输出的 spacetime 矩阵是扁平 1D 数组（n_steps * nx），
-    # 需要还原为 2D 数组（n_steps 行 × nx 列）以匹配前端热力图期望的格式。
     raw_nx = int(st.get('nx', sim_input.nx))
+    raw_n_steps = int(st.get('n_steps', 0))
     raw_water_flat: list[Any] = st.get('water_level_matrix', [])
     raw_flow_flat: list[Any] = st.get('flow_rate_matrix', [])
 
-    n_steps_from_flat = len(raw_water_flat) // raw_nx if raw_nx > 0 and len(raw_water_flat) > 0 else 0
-
-    if n_steps_from_flat > 0 and len(raw_water_flat) == n_steps_from_flat * raw_nx:
-        # reshape: 1D → 2D（每 n_steps 行，按时间优先排列）
+    # new exe outputs spacetime as flat 1D arrays (n_steps * nx), not 2D lists.
+    # Detect by checking if first element is a float (flat) or list (2D legacy format).
+    if raw_n_steps > 0 and raw_nx > 0 and len(raw_water_flat) == raw_n_steps * raw_nx:
+        # Reshape flat 1D → 2D (n_steps rows × nx cols), row-major order
         st_water: list[list[float]] = [
             [float(raw_water_flat[step * raw_nx + ix]) for ix in range(raw_nx)]
-            for step in range(n_steps_from_flat)
+            for step in range(raw_n_steps)
         ]
         st_flow: list[list[float]] = [
             [float(raw_flow_flat[step * raw_nx + ix]) for ix in range(raw_nx)]
-            for step in range(n_steps_from_flat)
+            for step in range(raw_n_steps)
         ]
         st_times: list[float] = st.get('times', [])
-        # 如果 times 长度与矩阵行数不一致，按 dt 重建
-        if len(st_times) != n_steps_from_flat:
+        if len(st_times) != raw_n_steps:
             dt_raw = ch.get('dt', sim_input.dt)
-            st_times = [step * dt_raw for step in range(n_steps_from_flat)]
+            st_times = [step * dt_raw for step in range(raw_n_steps)]
+    elif raw_n_steps > 0 and len(raw_water_flat) > 0 and isinstance(raw_water_flat[0], list):
+        # Legacy 2D list format already
+        st_water = [[float(v) for v in row] for row in raw_water_flat]
+        st_flow = [[float(v) for v in row] for row in raw_flow_flat]
+        st_times = st.get('times', [])
     else:
-        # 回退：保持原样（exe 输出格式已为 2D）
+        # Fallback: keep as-is
         st_water = raw_water_flat
         st_flow = raw_flow_flat
         st_times = st.get('times', [])
+        raw_n_steps = len(st_water) if st_water else 0
 
     return {
         'channel': {

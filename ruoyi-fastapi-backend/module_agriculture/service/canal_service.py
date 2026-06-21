@@ -21,7 +21,6 @@ from module_agriculture.entity.vo.canal_vo import (
     CanalBasePageQueryModel,
     CanalBaseUpdateModel,
 )
-from module_irrigation.model.canals_data import build_topology, parse_canal_row
 from utils.common_util import CamelCaseUtil
 
 
@@ -98,78 +97,6 @@ class CanalService:
         if deleted == 0:
             raise ServiceException(message='未找到可删除的渠段')
         return CrudResponseModel(is_success=True, message=f'已删除 {deleted} 条')
-
-    @classmethod
-    async def import_from_csv_services(
-        cls, query_db: AsyncSession, file: UploadFile
-    ) -> CrudResponseModel:
-        content = await file.read()
-        if not content:
-            raise ServiceException(message='上传文件为空')
-        try:
-            text = content.decode('utf-8-sig')
-        except UnicodeDecodeError as exc:
-            raise ServiceException(message=f'文件编码错误，需 UTF-8: {exc}') from exc
-
-        inserted = 0
-        updated = 0
-        try:
-            reader = csv.DictReader(io.StringIO(text))
-            for row in reader:
-                parsed = parse_canal_row(row)
-                if parsed is None:
-                    continue
-                _obj, is_new = await CanalDao.upsert_canal(query_db, parsed)
-                if is_new:
-                    inserted += 1
-                else:
-                    updated += 1
-            await query_db.commit()
-        except Exception:
-            await query_db.rollback()
-            raise
-        return CrudResponseModel(
-            is_success=True,
-            message=f'导入完成：新增 {inserted} 条，更新 {updated} 条',
-            result={'inserted': inserted, 'updated': updated, 'total': inserted + updated},
-        )
-
-    @classmethod
-    async def get_topology_services(cls, query_db: AsyncSession) -> dict[str, Any]:
-        records = await CanalDao.get_all_canals(query_db)
-        if not records:
-            return {'roots': [], 'nodes': [], 'edges': []}
-
-        ids = [r.canal_id for r in records]
-        parent_ids, _children = build_topology(ids)
-
-        nodes: list[dict[str, Any]] = []
-        for rec in records:
-            node = {
-                'id': rec.canal_id,
-                'name': rec.canal_name,
-                'level': rec.level,
-                'length': float(rec.length or 0),
-                'design_flow': float(rec.design_flow or 0),
-                'water_demand': float(rec.water_demand or 0),
-            }
-            nodes.append(node)
-
-        edges: list[dict[str, Any]] = []
-        for rec in records:
-            parent = parent_ids.get(rec.canal_id)
-            if parent is not None:
-                edges.append(
-                    {
-                        'from': parent,
-                        'to': rec.canal_id,
-                        'length': float(rec.length or 0),
-                        'Q_design': float(rec.design_flow or 0),
-                    }
-                )
-
-        root_id = '1' if '1' in ids else ids[0]
-        return {'roots': [root_id], 'nodes': nodes, 'edges': edges}
 
     # ----------------------- 启动期辅助 -----------------------
 

@@ -86,16 +86,39 @@ double Channel::solveYfromA(double A_target) const {
 }
 
 void Channel::applyBoundaryConditions(double t) {
-    (void)t;
-    // 上游: Q 固定为 Q_upstream, A 从 Manning 反算保持一致
-    cells[0].Q = cfg.Q_upstream;
-    cells[0].y = normalDepth(cfg.Q_upstream);
+    // 上游: 时序流量 (线性插值); 无时序时用固定值
+    if (!cfg.Q_upstream_series.empty()) {
+        cells[0].Q = interpolateSeries(t, cfg.t_series, cfg.Q_upstream_series);
+    } else {
+        cells[0].Q = cfg.Q_upstream;
+    }
+    cells[0].y = normalDepth(cells[0].Q);
     cells[0].A = getA(cells[0].y);
 
-    // 下游: 零流量出流, A 从 Manning 反算 (Q ≈ 0 → 小面积)
-    cells[nx - 1].Q = 0.0;
-    cells[nx - 1].y = normalDepth(0.0);
+    // 下游: 水位-流量关系出流; 无 rating curve 时为零流
+    if (cfg.use_rating_curve && !cfg.y_ds_curve.empty()) {
+        double y_ds = cells[nx - 1].y;
+        double Q_ds = interpolateSeries(y_ds, cfg.y_ds_curve, cfg.Q_ds_curve);
+        cells[nx - 1].Q = std::max(0.0, Q_ds);
+    } else {
+        cells[nx - 1].Q = 0.0;
+    }
     cells[nx - 1].A = getA(cells[nx - 1].y);
+}
+
+double Channel::interpolateSeries(double x, const std::vector<double>& x_series,
+                                  const std::vector<double>& y_series) const {
+    if (x_series.empty() || y_series.empty()) return 0.0;
+    if (x_series.size() != y_series.size()) return y_series.back();
+    if (x <= x_series.front()) return y_series.front();
+    if (x >= x_series.back()) return y_series.back();
+    for (size_t k = 0; k < x_series.size() - 1; ++k) {
+        if (x >= x_series[k] && x <= x_series[k + 1]) {
+            double t = (x - x_series[k]) / (x_series[k + 1] - x_series[k]);
+            return y_series[k] + t * (y_series[k + 1] - y_series[k]);
+        }
+    }
+    return y_series.back();
 }
 
 double Channel::normalDepth(double Q) const {

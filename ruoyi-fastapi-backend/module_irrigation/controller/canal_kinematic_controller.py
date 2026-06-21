@@ -49,15 +49,20 @@ async def run_kinematic_sim(
         m:              边坡系数 (1:m)
         n_Manning:      Manning 糙率
         S0:             渠底坡降
-        Q_upstream:     上游流量 (m³/s)
+        Q_upstream:     上游流量 (m³/s)，与 inflow_series 二选一
+        Q_initial:      初始稳态流量 (m³/s)，默认等于 Q_upstream
         tf:             仿真总时长 (s)
         dt:             时间步长 (s)
+        theta:          迎风因子 (0.5-1.0)，默认 0.5
         tolerance:      Picard 收敛容差（默认 1e-6）
         max_iterations: Picard 最大迭代次数（默认 100）
         output_interval_sec: 输出时间分辨率 (s)（默认 1.0）
         A_wet_min:     最小过水面积（默认 0.1）
         branches:       分水口列表 [{"x_position": float, "Q_offtake": float, "spread_cells": int}]
-        inflow_series:  上游流量时序 [{"t_sec": float, "q_m3s": float}]（可选）
+        inflow_series:  上游流量时序 [{"t_sec": float, "q_m3s": float}]（可选，优先级高于 Q_upstream）
+        use_rating_curve: 是否使用下游水位-流量关系曲线（默认 false）
+        y_ds_curve:    下游水位序列 [y1, y2, ...]（m），与 use_rating_curve 配合使用
+        Q_ds_curve:    对应下游流量序列 [Q1, Q2, ...]（m³/s），与 use_rating_curve 配合使用
     """
     canal_id = str(payload.get('canal_id', 'unknown'))
     L = float(payload.get('L', 1000.0))
@@ -67,12 +72,17 @@ async def run_kinematic_sim(
     n_Manning = float(payload.get('n_Manning', 0.025))
     S0 = float(payload.get('S0', 1 / 3000.0))
     Q_upstream = float(payload.get('Q_upstream', 10.0))
+    Q_initial = float(payload.get('Q_initial', Q_upstream))
     tf = float(payload.get('tf', 3600.0))
     dt = float(payload.get('dt', 10.0))
+    theta = float(payload.get('theta', 0.5))
     tolerance = float(payload.get('tolerance', 1e-6))
     max_iterations = int(payload.get('max_iterations', 100))
     output_interval_sec = float(payload.get('output_interval_sec', 1.0))
     A_wet_min = float(payload.get('A_wet_min', 0.1))
+    use_rating_curve = bool(payload.get('use_rating_curve', False))
+    y_ds_curve = [float(v) for v in payload.get('y_ds_curve', [])]
+    Q_ds_curve = [float(v) for v in payload.get('Q_ds_curve', [])]
 
     branches = payload.get('branches', [])
     inflow_series_raw = payload.get('inflow_series', None)
@@ -81,8 +91,8 @@ async def run_kinematic_sim(
         Q_upstream_series = [(float(p['t_sec']), float(p['q_m3s'])) for p in inflow_series_raw]
 
     logger.info(
-        'kinematic wave request: canal_id=%s, L=%.1f, nx=%d, Q=%.3f, tf=%.1f, dt=%.1f, n_branches=%d',
-        canal_id, L, nx, Q_upstream, tf, dt, len(branches),
+        f'kinematic wave request: canal_id={canal_id}, L={L}, nx={nx}, Q={Q_upstream}, tf={tf}, dt={dt}, '
+        f'theta={theta}, rating_curve={use_rating_curve}, n_branches={len(branches)}',
     )
 
     try:
@@ -94,14 +104,19 @@ async def run_kinematic_sim(
             n_Manning=n_Manning,
             S0=S0,
             Q_upstream=Q_upstream,
+            Q_initial=Q_initial,
             tf=tf,
             dt=dt,
+            theta=theta,
             branches=branches,
             tolerance=tolerance,
             max_iterations=max_iterations,
             output_interval_sec=output_interval_sec,
             A_wet_min=A_wet_min,
             Q_upstream_series=Q_upstream_series,
+            use_rating_curve=use_rating_curve,
+            y_ds_curve=y_ds_curve,
+            Q_ds_curve=Q_ds_curve,
             canal_id=canal_id,
         )
     except FileNotFoundError as exc:

@@ -40,12 +40,22 @@ static void printConfigEcho(const ChannelConfig& cfg,
     std::cout << "    Side slope m = " << cfg.m << "\n";
     std::cout << "    Manning n = " << cfg.n_Manning << "\n";
     std::cout << "    Bed slope S0 = " << cfg.S0 << "\n";
-    std::cout << "    Upstream Q_in = " << cfg.Q_upstream << " m3/s\n";
+    if (!cfg.Q_upstream_series.empty() && !cfg.t_series.empty()) {
+        std::cout << "    Upstream Q = time-series (" << cfg.Q_upstream_series.size() << " points)\n";
+    } else {
+        std::cout << "    Upstream Q_in = " << cfg.Q_upstream << " m3/s\n";
+    }
     std::cout << "    Initial Q_0 = "
               << (cfg.Q_initial > 0 ? cfg.Q_initial : cfg.Q_upstream)
               << " m3/s\n";
     std::cout << "    Total time tf = " << cfg.tf << " s\n";
-    std::cout << "    Time step dt = " << cfg.dt << " s\n\n";
+    std::cout << "    Time step dt = " << cfg.dt << " s\n";
+    if (cfg.use_rating_curve) {
+        std::cout << "    Downstream: rating curve (" << cfg.y_ds_curve.size() << " points)\n";
+    } else {
+        std::cout << "    Downstream: zero flow\n";
+    }
+    std::cout << "\n";
 
     std::cout << "  Solver: Kinematic Wave, tolerance="
               << solver.tolerance

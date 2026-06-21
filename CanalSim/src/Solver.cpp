@@ -79,7 +79,7 @@ bool Solver::solveStep(Channel& ch, double dt) {
     const double S0 = ch.cfg.S0;
     const double b  = ch.cfg.b;
     const double m  = ch.cfg.m;
-    const double Q_in = ch.cfg.Q_upstream;
+    const double Q_in = ch.cells[0].Q;
 
     std::vector<double> A_old(N), A_new(N);
     for (int i = 0; i < N; ++i) A_old[i] = ch.cells[i].A;
@@ -137,14 +137,16 @@ bool Solver::solveStep(Channel& ch, double dt) {
         }
 
         // -------------------------------------------------------------------
-        // 下游边界: Q_{N-1} = 0 (零流量出流)
-        // 格点 i = N-1 的方程: (A_{N-1} - A_old_{N-1})/dt + qL_{N-1} = 0
-        // 解得 A_{N-1}^{new} = A_old_{N-1} - qL_{N-1} * dt
+        // 下游边界: 水位-流量关系出流
+        //   Q_{N-1} = Q_ds(y_{N-1})（由 applyBoundaryConditions 在迭代中更新）
+        //   格点 i = N-1 的方程简化为质量守恒:
+        //   (A_{N-1} - A_old_{N-1})/dt - qL_{N-1} = 0
+        //   Jacobian: aa=0, bb=1/dt (隐式处理，仅时间项)
         // -------------------------------------------------------------------
         {
             int i = N - 1;
             double qL = ch.cfg.branches.offtakeAt(i, dx, N);
-            rhs[i] = -((A_new[i] - A_old[i]) / dt + qL);
+            rhs[i] = -(A_new[i] - A_old[i]) / dt - qL;
             aa[i]  = 0.0;
             bb[i]  = 1.0 / dt;
             cc[i]  = 0.0;

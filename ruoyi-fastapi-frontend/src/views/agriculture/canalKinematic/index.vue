@@ -116,6 +116,63 @@
               </div>
             </template>
 
+            <!-- Rating Curve Q-y 曲线（自动生成 + 可编辑） -->
+            <div class="divider-soft" />
+            <el-collapse v-model="ratingCurveOpen" class="rating-curve-collapse mb12">
+              <el-collapse-item title="下游边界 · 流量-水位曲线（自动生成）" name="true">
+                <template #title>
+                  <div class="rating-curve-header">
+                    <span class="rating-curve-title">下游边界 · 流量-水位曲线</span>
+                    <el-tag size="small" type="success" effect="plain">自动生成</el-tag>
+                  </div>
+                </template>
+                <div v-if="ratingCurvePoints.length > 0">
+                  <div class="rating-curve-toolbar mb6">
+                    <span style="font-size:11px;color:var(--text-secondary);">Manning 公式 · 共 {{ ratingCurvePoints.length }} 个点</span>
+                    <el-button size="small" link type="primary" @click.stop="recomputeRatingCurve">
+                      <el-icon><RefreshRight /></el-icon> 重新计算
+                    </el-button>
+                  </div>
+                  <el-table :data="ratingCurvePoints" size="small" stripe max-height="220" style="font-size:12px;">
+                    <el-table-column label="序号" type="index" width="50" align="center" />
+                    <el-table-column label="y 水位 (m)" prop="y" align="right" min-width="120">
+                      <template #default="{ row, $index }">
+                        <el-input-number
+                          v-model="ratingCurvePoints[$index].y"
+                          :min="0.001" :step="0.05" :precision="4"
+                          size="small" controls-position="right"
+                          style="width: 110px;"
+                        />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="Q 流量 (m³/s)" prop="Q" align="right" min-width="120">
+                      <template #default="{ row, $index }">
+                        <el-input-number
+                          v-model="ratingCurvePoints[$index].Q"
+                          :min="0" :step="0.5" :precision="4"
+                          size="small" controls-position="right"
+                          style="width: 110px;"
+                        />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="60" align="center">
+                      <template #default="{ $index }">
+                        <el-button size="small" type="danger" link @click="ratingCurvePoints.splice($index, 1)">
+                          <el-icon><Delete /></el-icon>
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <el-button size="small" plain class="mt6" @click="addRatingCurvePoint">
+                    <el-icon><Plus /></el-icon> 添加点
+                  </el-button>
+                </div>
+                <div v-else class="muted-text" style="font-size:12px;padding:8px 0;">
+                  选择渠段后自动生成 Q-y 曲线
+                </div>
+              </el-collapse-item>
+            </el-collapse>
+
             <div class="divider-soft" />
 
             <!-- 仿真时长 -->
@@ -246,7 +303,7 @@
           <div class="kpi-row">
             <div class="kpi-box kpi-box--0">
               <div class="kpi-label">上游流量</div>
-              <div class="kpi-value">{{ fmtNumber(result.summary?.Q_upstream, 3) }}<span class="kpi-unit">m³/s</span></div>
+              <div class="kpi-value">{{ fmtNumber(form.QUpstream, 3) }}<span class="kpi-unit">m³/s</span></div>
               <div class="kpi-foot">设计流量</div>
             </div>
             <div class="kpi-box kpi-box--1">
@@ -292,30 +349,36 @@
             <div ref="waterLevelHeatmapRef" class="chart chart--heatmap" />
           </el-card>
 
-          <!-- 上下游流量时序 -->
+          <!-- 流量时空3D曲面 -->
           <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
-                  <span class="chart-title">上下游流量时序</span>
-                  <span class="chart-sub">Q(t) 上下游边界流量随时间变化</span>
+                  <span class="chart-title">流量时空3D曲面</span>
+                  <span class="chart-sub">x=空间 (km) · t=时间 (h) · z=Q 流量 (m³/s)</span>
+                </div>
+                <div class="chart-tags">
+                  <el-tag size="small" type="warning">3D 曲面</el-tag>
                 </div>
               </div>
             </template>
-            <div ref="flowSeriesRef" class="chart" />
+            <div ref="flowSeriesRef" class="chart chart--surface" />
           </el-card>
 
-          <!-- 上下游水深时序 -->
+          <!-- 水深时空3D曲面 -->
           <el-card shadow="hover" class="chart-card glass-card result-card mt16">
             <template #header>
               <div class="chart-header">
                 <div>
-                  <span class="chart-title">上下游水深时序</span>
-                  <span class="chart-sub">h(t) 上下游水位随时间变化</span>
+                  <span class="chart-title">水深时空3D曲面</span>
+                  <span class="chart-sub">x=空间 (km) · t=时间 (h) · z=水深 y (m)</span>
+                </div>
+                <div class="chart-tags">
+                  <el-tag size="small" type="primary">3D 曲面</el-tag>
                 </div>
               </div>
             </template>
-            <div ref="depthSeriesRef" class="chart" />
+            <div ref="depthSeriesRef" class="chart chart--surface" />
           </el-card>
 
           <!-- 渠段剖面（最终状态） -->
@@ -362,8 +425,9 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Delete, Plus, Promotion } from '@element-plus/icons-vue'
+import { Delete, Plus, Promotion, RefreshRight } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import 'echarts-gl'
 import { listCanal as fetchCanals, runKinematicSim } from '@/api/agriculture/canal'
 
 const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
@@ -391,6 +455,51 @@ const result = ref(null)
 const resultError = ref(null)
 
 // ---------------------------------------------------------------------------
+// Rating Curve（Q-y 曲线）计算
+// ---------------------------------------------------------------------------
+function areaTopwidth(y, b, m) {
+  const A = (b + m * y) * y
+  const T = b + 2 * m * y
+  return { A, T }
+}
+
+function computeRatingCurve(b, m, n_Manning, S0) {
+  if (!b || !n_Manning || !S0 || S0 <= 0 || n_Manning <= 0) return []
+  const n = n_Manning
+  const Sf = Math.sqrt(S0)
+
+  function manningNormalDepth(Q, b, m, n, S0) {
+    if (Q <= 0 || n <= 0 || S0 <= 0) return 0.1
+    let lo = 0.001, hi = 50.0
+    for (let iter = 0; iter < 80; iter++) {
+      const mid = (lo + hi) / 2
+      const { A } = areaTopwidth(mid, b, m)
+      const P = b + 2 * mid * Math.sqrt(1 + m * m)
+      const R = A / P
+      const Qmid = A * Math.pow(R, 2 / 3) * Math.sqrt(S0) / n
+      if (Qmid < Q) lo = mid
+      else hi = mid
+    }
+    return (lo + hi) / 2
+  }
+
+  const y0 = manningNormalDepth(form.QUpstream || 10.0, b, m, n, S0)
+  const yMax = Math.max(2.5 * y0, 0.5)
+
+  const points = []
+  const step = (yMax - 0.05) / 19
+  for (let i = 0; i < 20; i++) {
+    const y = parseFloat((0.05 + i * step).toFixed(4))
+    const { A } = areaTopwidth(y, b, m)
+    const P = b + 2 * y * Math.sqrt(1 + m * m)
+    const R = A / P
+    const Q = parseFloat((A * Math.pow(R, 2 / 3) * Sf / n).toFixed(4))
+    points.push({ y, Q })
+  }
+  return points
+}
+
+// ---------------------------------------------------------------------------
 // 表单
 // ---------------------------------------------------------------------------
 const form = reactive({
@@ -411,6 +520,8 @@ const form = reactive({
 })
 
 const selectedCanal = ref(null)
+const ratingCurvePoints = ref([])
+const ratingCurveOpen = ref([])
 
 // ---------------------------------------------------------------------------
 // 工具函数
@@ -466,7 +577,7 @@ async function loadFromDb() {
 }
 
 function onCanalChange(canalId) {
-  if (!canalId) { selectedCanal.value = null; return }
+  if (!canalId) { selectedCanal.value = null; ratingCurvePoints.value = []; result.value = null; resultError.value = null; return }
   const canal = dbCanals.value.find(c => c.canal_id === canalId)
   if (!canal) return
   selectedCanal.value = canal
@@ -475,7 +586,10 @@ function onCanalChange(canalId) {
   form.nManning = Number(canal.roughness) || 0.025
   form.S0 = Number(canal.slope) || 0.0003
   form.QUpstream = Number(canal.design_flow) || 10.0
-  // 自动从子渠道生成默认分水口
+  ratingCurvePoints.value = computeRatingCurve(form.b, form.m, form.nManning, form.S0)
+  ratingCurveOpen.value = ['true']
+  result.value = null
+  resultError.value = null
   buildDefaultBranches(canal)
 }
 
@@ -497,6 +611,25 @@ function buildDefaultBranches(canal) {
       spreadCells: 3,
     })
   })
+}
+
+function recomputeRatingCurve() {
+  ratingCurvePoints.value = computeRatingCurve(form.b, form.m, form.nManning, form.S0)
+}
+
+function addRatingCurvePoint() {
+  const last = ratingCurvePoints.value[ratingCurvePoints.value.length - 1]
+  const y0 = last ? last.y * 1.2 : 0.5
+  const { A } = areaTopwidth(y0, form.b, form.m)
+  const P = form.b + 2 * y0 * Math.sqrt(1 + form.m * form.m)
+  const R = A / P
+  const Q = parseFloat((A * Math.pow(R, 2 / 3) * Math.sqrt(form.S0) / form.nManning).toFixed(4))
+  ratingCurvePoints.value.push({ y: parseFloat(y0.toFixed(4)), Q })
+  ratingCurvePoints.value.sort((a, b) => a.y - b.y)
+}
+
+function removeRatingCurvePoint(index) {
+  ratingCurvePoints.value.splice(index, 1)
 }
 
 // ---------------------------------------------------------------------------
@@ -567,6 +700,9 @@ async function handleSubmit() {
     output_interval_sec: Number(form.outputIntervalSec),
     branches,
     inflow_series: inflowSeries,
+    use_rating_curve: ratingCurvePoints.value.length >= 2,
+    y_ds_curve: ratingCurvePoints.value.map(p => Number(p.y)),
+    Q_ds_curve: ratingCurvePoints.value.map(p => Number(p.Q)),
   }
 
   try {
@@ -591,6 +727,8 @@ function handleReset() {
   form.nx = 51
   form.outputIntervalSec = 5
   selectedCanal.value = null
+  ratingCurvePoints.value = []
+  ratingCurveOpen.value = []
   result.value = null
   resultError.value = null
 }
@@ -673,23 +811,86 @@ function renderFlowSeries() {
   flowSeriesChart = initChart(flowSeriesRef.value, flowSeriesChart)
   if (!flowSeriesChart) return
 
-  const ts = result.value?.timeseries
-  if (!ts) return
+  const spacetime = result.value?.spacetime
+  const channel = result.value?.channel
+  if (!spacetime || !channel) {
+    const ts = result.value?.timeseries
+    if (!ts) return
+    const t = ts.t || []
+    const qUp = ts.Q_upstream || []
+    const qDown = ts.Q_downstream || []
+    flowSeriesChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend: { data: ['上游流量', '下游流量'], top: 0, textStyle: { fontSize: 12 } },
+      grid: { top: 40, left: 55, right: 20, bottom: 40 },
+      xAxis: { type: 'category', data: t, name: 't (s)', nameLocation: 'middle', nameGap: 30, axisLabel: { fontSize: 11, interval: Math.max(0, Math.floor(t.length / 6) - 1) } },
+      yAxis: { type: 'value', name: 'Q (m³/s)', axisLabel: { fontSize: 11 } },
+      series: [
+        { name: '上游流量', type: 'line', data: qUp, smooth: true, itemStyle: { color: '#3b82f6' }, lineStyle: { width: 2 }, showSymbol: false },
+        { name: '下游流量', type: 'line', data: qDown, smooth: true, itemStyle: { color: '#22c55e' }, lineStyle: { width: 2 }, showSymbol: false },
+      ]
+    })
+    return
+  }
 
-  const t = ts.t || []
-  const qUp = ts.Q_upstream || []
-  const qDown = ts.Q_downstream || []
+  const nx = Number(channel.nx) || 51
+  const L = Number(channel.L) || 10000
+  const times = spacetime.times || []
+  const qm = spacetime.flow_rate_matrix || []
+
+  if (times.length < 2 || qm.length < 2 || nx < 2) {
+    flowSeriesChart.setOption({ title: { text: '无流量时空数据', left: 'center' } })
+    return
+  }
+
+  const xData = Array.from({ length: nx }, (_, i) => parseFloat((i * L / (nx - 1) / 1000).toFixed(4)))
+  const tHours = times.map(s => parseFloat((s / 3600).toFixed(4)))
+  const xMax = xData[xData.length - 1]
+  const tMax = tHours[tHours.length - 1]
+
+  const data = []
+  for (let tIdx = 0; tIdx < times.length; tIdx++) {
+    const row = qm[tIdx]
+    if (!row) continue
+    for (let xIdx = 0; xIdx < Math.min(row.length, nx); xIdx++) {
+      data.push([xData[xIdx], tHours[tIdx], parseFloat(Number(row[xIdx]).toFixed(4))])
+    }
+  }
+
+  const allVals = data.map(d => d[2])
+  const minV = Math.min(...allVals)
+  const maxV = Math.max(...allVals, minV + 0.01)
 
   flowSeriesChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-    legend: { data: ['上游流量', '下游流量'], top: 0, textStyle: { fontSize: 12 } },
-    grid: { top: 40, left: 55, right: 20, bottom: 40 },
-    xAxis: { type: 'category', data: t, name: 't (s)', nameLocation: 'middle', nameGap: 30, axisLabel: { fontSize: 11, interval: Math.max(0, Math.floor(t.length / 6) - 1) } },
-    yAxis: { type: 'value', name: 'Q (m³/s)', axisLabel: { fontSize: 11 } },
-    series: [
-      { name: '上游流量', type: 'line', data: qUp, smooth: true, itemStyle: { color: '#3b82f6' }, lineStyle: { width: 2 }, showSymbol: false },
-      { name: '下游流量', type: 'line', data: qDown, smooth: true, itemStyle: { color: '#22c55e' }, lineStyle: { width: 2 }, showSymbol: false },
-    ]
+    notMerge: true,
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => `x=${p.data[0].toFixed(1)} km<br/>t=${p.data[1].toFixed(3)} h<br/>Q=${p.data[2].toFixed(4)} m³/s`
+    },
+    visualMap: {
+      show: true, calculable: true,
+      min: minV, max: maxV,
+      orient: 'vertical', right: 10, top: 'center',
+      text: [maxV.toFixed(2), minV.toFixed(2)],
+      inRange: { color: ['#fef3c7', '#fbbf24', '#f97316', '#dc2626'] }
+    },
+    xAxis3D: { type: 'value', name: 'x (km)', nameLocation: 'middle', nameGap: 35, min: 0, max: xMax, axisLabel: { fontSize: 9 } },
+    yAxis3D: { type: 'value', name: 't (h)', nameLocation: 'middle', nameGap: 35, min: 0, max: tMax, axisLabel: { fontSize: 9 } },
+    zAxis3D: { type: 'value', name: 'Q (m³/s)', nameLocation: 'middle', nameGap: 55, axisLabel: { fontSize: 9 } },
+    grid3D: {
+      top: 20, left: 15, right: 60, bottom: 15,
+      viewControl: { alpha: 40, beta: 215, distance: 240, minDistance: 60, maxDistance: 600, rotateSensitivity: 1, zoomSensitivity: 1 },
+    },
+    series: [{
+      type: 'surface',
+      data,
+      shading: 'color',
+      silent: true,
+      dataShape: [times.length, nx],
+      wireframe: { show: true, lineStyle: { color: 'rgba(0,0,0,0.08)', width: 1 } },
+      itemStyle: { borderWidth: 0 },
+      emphasis: { disabled: true },
+    }]
   })
 }
 
@@ -697,23 +898,86 @@ function renderDepthSeries() {
   depthSeriesChart = initChart(depthSeriesRef.value, depthSeriesChart)
   if (!depthSeriesChart) return
 
-  const ts = result.value?.timeseries
-  if (!ts) return
+  const spacetime = result.value?.spacetime
+  const channel = result.value?.channel
+  if (!spacetime || !channel) {
+    const ts = result.value?.timeseries
+    if (!ts) return
+    const t = ts.t || []
+    const yUp = ts.y_upstream || []
+    const yDown = ts.y_downstream || []
+    depthSeriesChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend: { data: ['上游水深', '下游水深'], top: 0, textStyle: { fontSize: 12 } },
+      grid: { top: 40, left: 55, right: 20, bottom: 40 },
+      xAxis: { type: 'category', data: t, name: 't (s)', nameLocation: 'middle', nameGap: 30, axisLabel: { fontSize: 11, interval: Math.max(0, Math.floor(t.length / 6) - 1) } },
+      yAxis: { type: 'value', name: 'h (m)', axisLabel: { fontSize: 11 } },
+      series: [
+        { name: '上游水深', type: 'line', data: yUp, smooth: true, itemStyle: { color: '#f97316' }, lineStyle: { width: 2 }, showSymbol: false },
+        { name: '下游水深', type: 'line', data: yDown, smooth: true, itemStyle: { color: '#a855f7' }, lineStyle: { width: 2 }, showSymbol: false },
+      ]
+    })
+    return
+  }
 
-  const t = ts.t || []
-  const yUp = ts.y_upstream || []
-  const yDown = ts.y_downstream || []
+  const nx = Number(channel.nx) || 51
+  const L = Number(channel.L) || 10000
+  const times = spacetime.times || []
+  const wlm = spacetime.water_level_matrix || []
+
+  if (times.length < 2 || wlm.length < 2 || nx < 2) {
+    depthSeriesChart.setOption({ title: { text: '无水位时空数据', left: 'center' } })
+    return
+  }
+
+  const xData = Array.from({ length: nx }, (_, i) => parseFloat((i * L / (nx - 1) / 1000).toFixed(4)))
+  const tHours = times.map(s => parseFloat((s / 3600).toFixed(4)))
+  const xMax = xData[xData.length - 1]
+  const tMax = tHours[tHours.length - 1]
+
+  const data = []
+  for (let tIdx = 0; tIdx < times.length; tIdx++) {
+    const row = wlm[tIdx]
+    if (!row) continue
+    for (let xIdx = 0; xIdx < Math.min(row.length, nx); xIdx++) {
+      data.push([xData[xIdx], tHours[tIdx], parseFloat(Number(row[xIdx]).toFixed(4))])
+    }
+  }
+
+  const allVals = data.map(d => d[2])
+  const minV = Math.min(...allVals)
+  const maxV = Math.max(...allVals, minV + 0.01)
 
   depthSeriesChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-    legend: { data: ['上游水深', '下游水深'], top: 0, textStyle: { fontSize: 12 } },
-    grid: { top: 40, left: 55, right: 20, bottom: 40 },
-    xAxis: { type: 'category', data: t, name: 't (s)', nameLocation: 'middle', nameGap: 30, axisLabel: { fontSize: 11, interval: Math.max(0, Math.floor(t.length / 6) - 1) } },
-    yAxis: { type: 'value', name: 'h (m)', axisLabel: { fontSize: 11 } },
-    series: [
-      { name: '上游水深', type: 'line', data: yUp, smooth: true, itemStyle: { color: '#f97316' }, lineStyle: { width: 2 }, showSymbol: false },
-      { name: '下游水深', type: 'line', data: yDown, smooth: true, itemStyle: { color: '#a855f7' }, lineStyle: { width: 2 }, showSymbol: false },
-    ]
+    notMerge: true,
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => `x=${p.data[0].toFixed(1)} km<br/>t=${p.data[1].toFixed(3)} h<br/>y=${p.data[2].toFixed(4)} m`
+    },
+    visualMap: {
+      show: true, calculable: true,
+      min: minV, max: maxV,
+      orient: 'vertical', right: 10, top: 'center',
+      text: [maxV.toFixed(2), minV.toFixed(2)],
+      inRange: { color: ['#eff6ff', '#3b82f6', '#1d4ed8'] }
+    },
+    xAxis3D: { type: 'value', name: 'x (km)', nameLocation: 'middle', nameGap: 35, min: 0, max: xMax, axisLabel: { fontSize: 9 } },
+    yAxis3D: { type: 'value', name: 't (h)', nameLocation: 'middle', nameGap: 35, min: 0, max: tMax, axisLabel: { fontSize: 9 } },
+    zAxis3D: { type: 'value', name: 'Water depth y (m)', nameLocation: 'middle', nameGap: 65, axisLabel: { fontSize: 9 } },
+    grid3D: {
+      top: 20, left: 15, right: 60, bottom: 15,
+      viewControl: { alpha: 40, beta: 215, distance: 240, minDistance: 60, maxDistance: 600, rotateSensitivity: 1, zoomSensitivity: 1 },
+    },
+    series: [{
+      type: 'surface',
+      data,
+      shading: 'color',
+      silent: true,
+      dataShape: [times.length, nx],
+      wireframe: { show: true, lineStyle: { color: 'rgba(0,0,0,0.08)', width: 1 } },
+      itemStyle: { borderWidth: 0 },
+      emphasis: { disabled: true },
+    }]
   })
 }
 
@@ -819,6 +1083,7 @@ onUnmounted(() => {
 .chart-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .chart { width: 100%; height: 280px; }
 .chart--heatmap { height: 320px; }
+.chart--surface { height: 360px; }
 
 .placeholder { padding: 56px 20px; text-align: center; background: var(--surface-soft-bg); border-radius: 20px; border: 1px dashed var(--hairline-color); }
 .placeholder-title { font-size: 1.1em; font-weight: 650; color: var(--text-primary); margin-bottom: 10px; }
@@ -845,5 +1110,12 @@ onUnmounted(() => {
 .tag--indigo { background: rgba(99, 102, 241, 0.1); color: #4338ca; border-color: rgba(99, 102, 241, 0.3); }
 .tag--violet { background: rgba(139, 92, 246, 0.1); color: #6d28d9; border-color: rgba(139, 92, 246, 0.3); }
 
-.result-col { display: flex; flex-direction: column; min-width: 0; }
+.rating-curve-collapse { border-radius: 10px; overflow: hidden; }
+.rating-curve-collapse :deep(.el-collapse-item__header) { padding: 0 12px; font-size: 13px; font-weight: 600; background: rgba(34, 197, 94, 0.05); border-color: rgba(34, 197, 94, 0.15); border-radius: 10px; }
+.rating-curve-collapse :deep(.el-collapse-item__wrap) { border-color: rgba(34, 197, 94, 0.15); }
+.rating-curve-collapse :deep(.el-collapse-item__content) { padding: 10px 8px 8px; }
+.rating-curve-header { display: flex; align-items: center; gap: 8px; }
+.rating-curve-title { font-size: 13px; font-weight: 600; }
+.rating-curve-toolbar { display: flex; align-items: center; justify-content: space-between; }
+.mt6 { margin-top: 6px; }
 </style>

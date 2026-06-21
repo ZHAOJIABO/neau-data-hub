@@ -36,6 +36,12 @@ int i(const json& j, const char* key, int dval) {
     if (it == j.end() || it->is_null()) return dval;
     return it->get<int>();
 }
+bool b(const json& j, const char* key, bool dval) {
+    auto it = j.find(key);
+    if (it == j.end() || it->is_null()) return dval;
+    if (it->is_boolean()) return it->get<bool>();
+    return dval;
+}
 bool present(const json& j, const char* key) {
     return j.find(key) != j.end() && !j.at(key).is_null();
 }
@@ -83,6 +89,7 @@ SimulationConfig ConfigIO::load(const std::string& path) {
     sc.channel.S0           = d(jc, "S0",           sc.channel.S0);
     sc.channel.Q_upstream   = d(jc, "Q_upstream",   sc.channel.Q_upstream);
     sc.channel.A_inflow     = d(jc, "A_inflow",     sc.channel.A_inflow);
+    sc.channel.use_rating_curve = b(jc, "use_rating_curve", sc.channel.use_rating_curve);
     sc.channel.g            = d(jc, "g",            sc.channel.g);
     sc.channel.A_wet_min   = d(jc, "A_wet_min",   sc.channel.A_wet_min);
     sc.channel.max_iter     = i(jc, "max_iter",     sc.channel.max_iter);
@@ -91,6 +98,30 @@ SimulationConfig ConfigIO::load(const std::string& path) {
     sc.channel.dt           = jc.at("dt").get<double>();
     // 初始流量 (瞬态初值); 缺省 0 -> Channel::initialize 用 Q_upstream
     sc.channel.Q_initial    = d(jc, "Q_initial",    0.0);
+
+    // 上游时序流量
+    if (present(jc, "Q_upstream_series") && jc["Q_upstream_series"].is_array()) {
+        for (const auto& v : jc["Q_upstream_series"]) {
+            sc.channel.Q_upstream_series.push_back(v.get<double>());
+        }
+    }
+    if (present(jc, "t_series") && jc["t_series"].is_array()) {
+        for (const auto& v : jc["t_series"]) {
+            sc.channel.t_series.push_back(v.get<double>());
+        }
+    }
+
+    // 下游水位-流量关系曲线
+    if (present(jc, "y_ds_curve") && jc["y_ds_curve"].is_array()) {
+        for (const auto& v : jc["y_ds_curve"]) {
+            sc.channel.y_ds_curve.push_back(v.get<double>());
+        }
+    }
+    if (present(jc, "Q_ds_curve") && jc["Q_ds_curve"].is_array()) {
+        for (const auto& v : jc["Q_ds_curve"]) {
+            sc.channel.Q_ds_curve.push_back(v.get<double>());
+        }
+    }
 
     // ---- solver ----
     if (present(j, "solver")) {
@@ -155,7 +186,8 @@ void ConfigIO::saveResult(const std::string& path,
         {"V_downstream_final",  ch.cells[last].V},
         {"Fr_upstream_final",   ch.cells[0].Fr},
         {"Fr_downstream_final", ch.cells[last].Fr},
-        {"total_offtake_m3s",   total_offtake}
+        {"total_offtake_m3s",   total_offtake},
+        {"use_rating_curve",    ch.cfg.use_rating_curve}
     };
 
     // timeseries

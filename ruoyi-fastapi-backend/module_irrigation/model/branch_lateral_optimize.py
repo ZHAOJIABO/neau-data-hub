@@ -327,8 +327,6 @@ def solve_branch_lateral(ctx: BranchLateralContext) -> BranchLateralResult:
         ctx.pref_weight_flow_var,
     ])
 
-    _logger = logging.getLogger('branch_lateral_optimize')
-
     for n_groups in range(ctx.min_groups, ctx.max_groups + 1):
         problem = BranchLateralProblem(
             lateral_qd=lateral_qd,
@@ -352,56 +350,22 @@ def solve_branch_lateral(ctx: BranchLateralContext) -> BranchLateralResult:
             eliminate_duplicates=True,
         )
 
-        _logger.info(
-            'PYMOO START: n_groups=%d n_var=%d n_obj=%d n_constr=%d n_gen=%d pop=%d seed=%d',
-            n_groups, problem.n_var, problem.n_obj, problem.n_constr, ctx.n_gen, ctx.pop_size, ctx.seed,
-        )
-
-        try:
-            res = minimize(
-                problem,
-                algorithm,
-                termination=('n_gen', ctx.n_gen),
-                seed=ctx.seed,
-                verbose=False,
-            )
-        except Exception as exc:
-            _logger.error('PYMOO minimize raised %s: %s', type(exc).__name__, exc)
-            continue
-
-        _logger.info(
-            'PYMOO RESULT: n_groups=%d X=%s F=%s G=%s',
-            n_groups,
-            None if res.X is None else len(res.X),
-            None if res.F is None else (res.F.shape if hasattr(res.F, 'shape') else len(res.F)),
-            None if res.G is None else (res.G.shape if hasattr(res.G, 'shape') else len(res.G)),
+        res = minimize(
+            problem,
+            algorithm,
+            termination=('n_gen', ctx.n_gen),
+            seed=ctx.seed,
+            verbose=False,
         )
 
         if res.X is None or len(res.X) == 0:
-            _logger.warning('PYMOO: no solutions for n_groups=%d, skipping', n_groups)
-            continue
-
-        # 检查所有目标函数值是否全为 inf/nan
-        if np.all(~np.isfinite(res.F)):
-            _logger.error('PYMOO: ALL fitness values are inf/nan for n_groups=%d', n_groups)
             continue
 
         feasible_mask = np.sum(res.G > 1e-4, axis=1) == 0
         if not np.any(feasible_mask):
             feasible_mask = np.sum(res.G > 1e-2, axis=1) == 0
             if not np.any(feasible_mask):
-                g_violation = np.maximum(res.G, 0).mean(axis=1)
-                best_idx_relax = np.argsort(g_violation)[:min(5, len(g_violation))]
-                _logger.info(
-                    'PYMOO best G violations for n_groups=%d: %s',
-                    n_groups,
-                    [np.maximum(g, 0).max() for g in res.G[best_idx_relax]],
-                )
-                feasible_mask = np.zeros(len(res.X), dtype=bool)
-                feasible_mask[best_idx_relax] = True
-                if not np.any(feasible_mask):
-                    _logger.warning('PYMOO: no feasible solutions for n_groups=%d, skipping', n_groups)
-                    continue
+                continue
 
         X_feas = res.X[feasible_mask]
         F_feas = res.F[feasible_mask]
