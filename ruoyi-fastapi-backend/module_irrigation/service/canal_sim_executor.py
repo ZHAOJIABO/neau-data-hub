@@ -20,17 +20,28 @@ from typing import Any, Optional
 
 from utils.log_util import logger
 
-# canalsim.exe 的绝对路径（ruoyi-fastapi-backend/models/canalsim.exe）
-# __file__ = module_irrigation/service/canal_sim_executor.py
-#   dirname → module_irrigation/service
-#   dirname → module_irrigation
-#   dirname → ruoyi-fastapi-backend
-#   join     → ruoyi-fastapi-backend/models/canalsim.exe
-CANALSIM_EXE: str = os.path.join(
+# canalsim 可执行文件路径解析：
+#   - 仓库结构：ruoyi-fastapi-backend/models/canal/canalsim[.exe]
+#   - Windows（开发机）: models/canal/canalsim.exe
+#   - Linux  / Docker  : models/canal/canalsim
+# 容器中该目录由 Dockerfile.pg 编译 CanalSim 源码生成；本地开发机上放 canalsim.exe 即可。
+_MODELS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     'models',
-    'canalsim.exe',
 )
+_CANALSIM_DIR = os.path.join(_MODELS_DIR, 'canal')
+_CANALSIM_EXE_WIN = os.path.join(_CANALSIM_DIR, 'canalsim.exe')
+_CANALSIM_EXE_LINUX = os.path.join(_CANALSIM_DIR, 'canalsim')
+
+
+def _resolve_canalsim_exe() -> str:
+    """跨平台解析 canalsim 可执行文件路径（Windows 加 .exe 后缀，Linux 不加）。"""
+    if os.name == 'nt':
+        return _CANALSIM_EXE_WIN
+    return _CANALSIM_EXE_LINUX
+
+
+CANALSIM_EXE: str = _resolve_canalsim_exe()
 
 
 # ============================================================================
@@ -266,8 +277,10 @@ def _call_exe(sim_input: CanalSimInput, canal_id: str = 'unknown') -> dict[str, 
     """
     if not os.path.exists(CANALSIM_EXE):
         raise FileNotFoundError(
-            f'canalsim.exe not found at: {CANALSIM_EXE}\n'
-            'Please compile CanalSim or copy canalsim.exe to ruoyi-fastapi-backend/models/'
+            f'canalsim executable not found at: {CANALSIM_EXE}\n'
+            'On Windows, place canalsim.exe in ruoyi-fastapi-backend/models/canal/.\n'
+            'In Docker, the image should bake the Linux build at '
+            '/app/models/canal/canalsim (see Dockerfile.pg).'
         )
 
     with tempfile.TemporaryDirectory(prefix='canalsim_') as tmpdir:

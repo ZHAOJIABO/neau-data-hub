@@ -234,8 +234,8 @@ class IrrigationApiKeySettings(BaseSettings):
     """
 
     irrigation_api_key: str = 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
-    irrigation_model_dir: str = 'models'
-    irrigation_rl_model_path: str = 'models'
+    irrigation_model_dir: str = 'models/irrigation'
+    irrigation_rl_model_path: str = 'models/irrigation'
     irrigation_output_dir: str = 'caches/irrigation_output'
     irrigation_device: str = 'cpu'
 

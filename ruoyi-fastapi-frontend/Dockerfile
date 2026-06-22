@@ -2,17 +2,24 @@
 FROM node:18-slim AS builder
 WORKDIR /app
 
-# 复制源代码
-COPY . .
-
 # 设置npm镜像源
 RUN npm config set registry https://registry.npmmirror.com
 
+# 先单独拷贝 package 文件（利用 Docker 层缓存，依赖不变则这层 CACHED）
+COPY package.json package-lock.json ./
+
 # 安装依赖
-RUN npm install
+#  --no-audit --no-fund：跳过安全审计和资金提示，国内镜像源更稳
+#  --prefer-offline：本地有缓存就用，buildx cache 也能命中
+RUN npm ci --no-audit --no-fund --prefer-offline \
+    || npm install --no-audit --no-fund --prefer-offline --no-save
 
 # 增大 Node.js 内存限制，防止构建 OOM
 ENV NODE_OPTIONS="--max-old-space-size=1536"
+
+# 再拷贝其余源码（node_modules 已经在上一层装好了）
+# 关键：用 .dockerignore 排除 node_modules / dist / 日志 / .env.* 等
+COPY . .
 
 # 执行docker构建命令
 RUN npm run build:docker

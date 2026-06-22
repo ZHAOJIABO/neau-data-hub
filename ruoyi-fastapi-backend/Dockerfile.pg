@@ -1,3 +1,25 @@
+# syntax=docker/dockerfile:1.7
+
+# ====== 阶段 1：编译 CanalSim（带 g++，仅 build 时使用）======
+FROM python:3.10 AS canalsim-builder
+
+# 换阿里云 apt 源（官方 deb.debian.org 在国内常常连接失败）
+RUN rm -f /etc/apt/sources.list.d/*.list && \
+    echo "deb https://mirrors.aliyun.com/debian trixie main contrib non-free non-free-firmware" \
+        > /etc/apt/sources.list.d/aliyun.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        g++ make \
+    && rm -rf /var/lib/apt/lists/*
+
+# 复制 CanalSim 源码并编译；产物固化到 /out/canalsim
+COPY CanalSim/ /tmp/canalsim_src/
+RUN cd /tmp/canalsim_src \
+    && sed -i 's/^TARGET = canalsim.exe/TARGET = canalsim/' Makefile \
+    && make -j"$(nproc)" \
+    && mkdir -p /out \
+    && install -m 0755 canalsim /out/canalsim
+
+# ====== 阶段 2：运行时镜像（无 g++，更小更安全）======
 FROM python:3.10
 WORKDIR /app
 
@@ -6,17 +28,21 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
 
 # 第二层：其余大依赖（rasterio/sklearn/numpy），不常变，缓存命中率高
-COPY requirements-heavy.txt ./
+COPY ./ruoyi-fastapi-backend/requirements-heavy.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements-heavy.txt -i https://mirrors.aliyun.com/pypi/simple
 
 # 第三层：其余依赖，改动频繁但装得快
-COPY requirements.txt ./
+COPY ./ruoyi-fastapi-backend/requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
-# 再复制源代码
-COPY . .
+# 从 builder 阶段拷贝编译产物（g++ 不进入最终镜像）
+COPY --from=canalsim-builder /out/canalsim /app/models/canal/canalsim
+
+# 复制源代码（精准 COPY：只把后端源码拷进 /app，
+# 避免 CanalSim 源码、scripts/、前端等无关内容污染镜像层）
+COPY ./ruoyi-fastapi-backend/ ./
 
 # 暴露端口
 EXPOSE 9099
