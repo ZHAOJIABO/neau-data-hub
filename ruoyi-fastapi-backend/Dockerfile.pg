@@ -5,10 +5,19 @@
 # ====== 阶段 1：编译 CanalSim（带 g++，仅 build 时使用）======
 FROM python:3.10 AS canalsim-builder
 
-# 换阿里云 apt 源（官方 deb.debian.org 在国内常常连接失败）
-RUN rm -f /etc/apt/sources.list.d/*.list && \
-    echo "deb https://mirrors.aliyun.com/debian trixie main contrib non-free non-free-firmware" \
-        > /etc/apt/sources.list.d/aliyun.list && \
+# 换阿里云 apt 源（官方 deb.debian.org 在国内常常连接失败）。
+# python:3.10 镜像默认基于 Debian bullseye，因此源版本必须与镜像一致（不能写成 trixie）。
+# 使用 [signed-by=...] 显式指定密钥环，避免 GPG NO_PUBKEY 报错。
+RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/*.list; \
+    . /etc/os-release; \
+    CODENAME="${VERSION_CODENAME}"; \
+    echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://mirrors.aliyun.com/debian ${CODENAME} main contrib non-free non-free-firmware" \
+        > /etc/apt/sources.list.d/aliyun.list; \
+    echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://mirrors.aliyun.com/debian-security ${CODENAME}-security main contrib non-free non-free-firmware" \
+        >> /etc/apt/sources.list.d/aliyun.list; \
+    echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://mirrors.aliyun.com/debian ${CODENAME}-updates main contrib non-free non-free-firmware" \
+        >> /etc/apt/sources.list.d/aliyun.list; \
     apt-get update && apt-get install -y --no-install-recommends \
         g++ make \
     && rm -rf /var/lib/apt/lists/*
