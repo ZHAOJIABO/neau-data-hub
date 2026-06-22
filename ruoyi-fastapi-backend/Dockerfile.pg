@@ -1,4 +1,6 @@
-# syntax=docker/dockerfile:1.7
+# 默认 BuildKit syntax（Docker 23+ 内置），不用额外拉 docker/dockerfile:1.7，
+# 避免阿里云 docker hub 镜像源拉不到这个特殊仓库时报错。
+# 如果以后需要 1.7 的新特性（多阶段 --mount、COPY --exclude 等），再加回 # syntax=docker/dockerfile:1.7 并确保能拉到这个镜像
 
 # ====== 阶段 1：编译 CanalSim（带 g++，仅 build 时使用）======
 FROM python:3.10 AS canalsim-builder

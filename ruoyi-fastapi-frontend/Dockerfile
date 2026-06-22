@@ -6,7 +6,10 @@ WORKDIR /app
 RUN npm config set registry https://registry.npmmirror.com
 
 # 先单独拷贝 package 文件（利用 Docker 层缓存，依赖不变则这层 CACHED）
-COPY package.json package-lock.json ./
+# 关键：分两次 COPY，避免 BuildKit cache key 计算时对多文件做联合 snapshot
+#       （Docker 25/26 在某些 storage driver 下，联合 snapshot 会假报 "not found"）
+COPY package.json ./
+COPY package-lock.json ./
 
 # 安装依赖
 #  --no-audit --no-fund：跳过安全审计和资金提示，国内镜像源更稳
