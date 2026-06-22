@@ -1,0 +1,8 @@
+CanalSim
+.git
+pgdata
+redisdata
+__pycache__
+*.pyc
+*.pyo
+models/canal/

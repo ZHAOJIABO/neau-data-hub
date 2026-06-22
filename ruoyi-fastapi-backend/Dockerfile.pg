@@ -1,36 +1,3 @@
-# 默认 BuildKit syntax（Docker 23+ 内置），不用额外拉 docker/dockerfile:1.7，
-# 避免阿里云 docker hub 镜像源拉不到这个特殊仓库时报错。
-# 如果以后需要 1.7 的新特性（多阶段 --mount、COPY --exclude 等），再加回 # syntax=docker/dockerfile:1.7 并确保能拉到这个镜像
-
-# ====== 阶段 1：编译 CanalSim（带 g++，仅 build 时使用）======
-FROM python:3.10 AS canalsim-builder
-
-# 换阿里云 apt 源（官方 deb.debian.org 在国内常常连接失败）。
-# python:3.10 镜像默认基于 Debian bullseye，因此源版本必须与镜像一致（不能写成 trixie）。
-# 使用 [signed-by=...] 显式指定密钥环，避免 GPG NO_PUBKEY 报错。
-RUN set -eux; \
-    rm -f /etc/apt/sources.list.d/*.list; \
-    . /etc/os-release; \
-    CODENAME="${VERSION_CODENAME}"; \
-    echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://mirrors.aliyun.com/debian ${CODENAME} main contrib non-free non-free-firmware" \
-        > /etc/apt/sources.list.d/aliyun.list; \
-    echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://mirrors.aliyun.com/debian-security ${CODENAME}-security main contrib non-free non-free-firmware" \
-        >> /etc/apt/sources.list.d/aliyun.list; \
-    echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://mirrors.aliyun.com/debian ${CODENAME}-updates main contrib non-free non-free-firmware" \
-        >> /etc/apt/sources.list.d/aliyun.list; \
-    apt-get update && apt-get install -y --no-install-recommends \
-        g++ make \
-    && rm -rf /var/lib/apt/lists/*
-
-# 复制 CanalSim 源码并编译；产物固化到 /out/canalsim
-COPY CanalSim/ /tmp/canalsim_src/
-RUN cd /tmp/canalsim_src \
-    && sed -i 's/^TARGET = canalsim.exe/TARGET = canalsim/' Makefile \
-    && make -j"$(nproc)" \
-    && mkdir -p /out \
-    && install -m 0755 canalsim /out/canalsim
-
-# ====== 阶段 2：运行时镜像（无 g++，更小更安全）======
 FROM python:3.10
 WORKDIR /app
 
@@ -39,21 +6,30 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
 
 # 第二层：其余大依赖（rasterio/sklearn/numpy），不常变，缓存命中率高
-COPY ./ruoyi-fastapi-backend/requirements-heavy.txt ./
+COPY requirements-heavy.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements-heavy.txt -i https://mirrors.aliyun.com/pypi/simple
 
 # 第三层：其余依赖，改动频繁但装得快
-COPY ./ruoyi-fastapi-backend/requirements.txt ./
+COPY requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
-# 从 builder 阶段拷贝编译产物（g++ 不进入最终镜像）
-COPY --from=canalsim-builder /out/canalsim /app/models/canal/canalsim
+# 第四层：复制 CanalSim 源码并在镜像内编译 canalsim
+# 必须在容器内编译，以确保二进制链接容器自带的 libstdc++（GCC 10，GLIBCXX_3.4.28）
+# 避免宿主机交叉编译产生的 GLIBCXX 版本不兼容问题
+COPY CanalSim_src/ CanalSim_src/
+RUN g++ -std=c++17 -Wall -O2 -I CanalSim_src/include \
+        CanalSim_src/src/main.cpp CanalSim_src/src/Channel.cpp \
+        CanalSim_src/src/Solver.cpp CanalSim_src/src/ConfigIO.cpp CanalSim_src/src/Output.cpp \
+        -o canalsim && \
+    mkdir -p /app/models/canal && \
+    mv canalsim /app/models/canal/canalsim && \
+    chmod +x /app/models/canal/canalsim && \
+    rm -rf CanalSim_src/
 
-# 复制源代码（精准 COPY：只把后端源码拷进 /app，
-# 避免 CanalSim 源码、scripts/、前端等无关内容污染镜像层）
-COPY ./ruoyi-fastapi-backend/ ./
+# 再复制源代码
+COPY . .
 
 # 暴露端口
 EXPOSE 9099
