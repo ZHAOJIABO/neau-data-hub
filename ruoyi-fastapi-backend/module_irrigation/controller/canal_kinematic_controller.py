@@ -120,8 +120,8 @@ async def run_kinematic_sim(
             canal_id=canal_id,
         )
     except FileNotFoundError as exc:
-        logger.error('canalsim.exe not found: %s', exc)
-        return ResponseUtil.error(msg='仿真求解器未找到，请确认 canalsim.exe 已部署')
+        logger.error('canalsim.exe/canalsim not found: %s', exc)
+        return ResponseUtil.error(msg='仿真求解器未找到，请确认仿真求解器已部署')
     except (ValueError, RuntimeError) as exc:
         logger.error('canal sim exe failed: %s', exc)
         return ResponseUtil.error(msg=f'仿真执行失败: {exc}')
