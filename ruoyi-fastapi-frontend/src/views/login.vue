@@ -271,7 +271,7 @@ getCookie();
 }
 
 .login-showcase {
-  max-width: 560px;
+  max-width: 600px;
 }
 
 .login-showcase__eyebrow {
@@ -285,7 +285,7 @@ getCookie();
   margin: 0;
   font-size: clamp(42px, 6vw, 64px);
   line-height: 1.05;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .login-showcase__description {
