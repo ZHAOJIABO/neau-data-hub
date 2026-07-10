@@ -41,6 +41,23 @@
           </template>
 
           <el-form ref="formRef" :model="form" :rules="rules" label-position="top" size="small">
+            <el-divider content-position="left">气候场景预设</el-divider>
+            <el-form-item label="快速切换典型稻区">
+              <el-select v-model="presetKey" placeholder="选择预设场景" style="width: 100%" @change="applyPreset">
+                <el-option
+                  v-for="preset in presets"
+                  :key="preset.key"
+                  :label="preset.label"
+                  :value="preset.key"
+                >
+                  <div style="display: flex; flex-direction: column; gap: 2px">
+                    <span style="font-weight: 600">{{ preset.label }}</span>
+                    <span style="font-size: 11px; color: #64748b">{{ preset.hint }}</span>
+                  </div>
+                </el-option>
+              </el-select>
+            </el-form-item>
+
             <el-divider content-position="left">地块位置</el-divider>
             <el-row :gutter="12">
               <el-col :span="12">
@@ -73,7 +90,7 @@
             <el-row :gutter="12">
               <el-col :span="12">
                 <el-form-item label="土壤水分阈值" prop="soilMoistureThreshold">
-                  <el-input-number v-model="form.soilMoistureThreshold" :min="0.01" :max="0.99" :step="0.01" :precision="2" style="width: 100%" />
+                  <el-input-number v-model="form.soilMoistureThreshold" :min="0.17" :max="0.41" :step="0.01" :precision="2" style="width: 100%" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -83,7 +100,7 @@
               </el-col>
               <el-col :span="12">
                 <el-form-item label="单次灌溉水层(cm)" prop="singleIrrigationAmount">
-                  <el-input-number v-model="form.singleIrrigationAmount" :min="0" :max="20" :step="0.5" :precision="1" style="width: 100%" />
+                  <el-input-number v-model="form.singleIrrigationAmount" :min="0.1" :max="5" :step="0.1" :precision="2" style="width: 100%" />
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -166,7 +183,20 @@
               <div class="kpi-value">{{ fmtNumber(summary.totalIrrigation, 2) }}<span>cm</span></div>
             </div>
             <div class="kpi-box">
-              <div class="kpi-label">灌溉次数</div>
+              <div class="kpi-label">
+                灌溉次数
+                <el-tooltip
+                  v-if="result && summary.irrigationCount === 0"
+                  placement="top"
+                  effect="light"
+                >
+                  <template #content>
+                    当前气候场景下土壤水分始终高于阈值，未触发灌溉。<br />
+                    可降低"土壤水分阈值"、切换至"西北干旱"预设，或调小初始 WAV。
+                  </template>
+                  <el-icon class="kpi-warn"><WarningFilled /></el-icon>
+                </el-tooltip>
+              </div>
               <div class="kpi-value">{{ summary.irrigationCount }}<span>次</span></div>
             </div>
           </div>
@@ -225,7 +255,7 @@
 <script setup>
 import { computed, nextTick, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Promotion, Refresh, TrendCharts } from '@element-plus/icons-vue'
+import { Promotion, Refresh, TrendCharts, WarningFilled } from '@element-plus/icons-vue'
 
 import { simulateRiceGrowth } from '@/api/model/cropGrowth'
 import MetricChart from './MetricChart.vue'
@@ -233,25 +263,68 @@ import MetricChart from './MetricChart.vue'
 defineOptions({ name: 'CropGrowth' })
 
 const defaultForm = () => ({
-  longitude: 126.63,
-  latitude: 45.75,
+  longitude: 124.30,
+  latitude: 48.42,
   simulationStartDate: '2025-05-15',
   plantStartDate: '2025-05-20',
   irrigationEndDate: '2025-08-20',
   plantEndDate: '2025-09-10',
-  soilMoistureThreshold: 0.32,
+  soilMoistureThreshold: 0.22,
   irrigationEfficiency: 0.75,
-  singleIrrigationAmount: 3.0,
+  singleIrrigationAmount: 1.5,
   varietyName: 'Rice_IR72_WS',
   site: {
     ifunrn: 0,
     notinf: 0,
     ssi: 0,
     ssmax: 0,
-    wav: 20,
+    wav: 5,
     smlim: 0.4
   }
 })
+
+const presets = [
+  {
+    key: 'chahayang',
+    label: '查哈阳灌区(黑龙江甘南)',
+    hint: '年降水 468 mm，需多次灌溉',
+    payload: { longitude: 124.30, latitude: 48.42, wav: 5 }
+  },
+  {
+    key: 'northeast',
+    label: '东北湿润稻区(哈尔滨)',
+    hint: '夏季降雨充沛，灌溉需求低',
+    payload: { longitude: 126.63, latitude: 45.75, wav: 20 }
+  },
+  {
+    key: 'north',
+    label: '华北半湿润(北京)',
+    hint: '中等灌溉需求',
+    payload: { longitude: 116.40, latitude: 39.90, wav: 15 }
+  },
+  {
+    key: 'northwest',
+    label: '西北干旱(银川)',
+    hint: '降雨稀少，需要多次灌溉',
+    payload: { longitude: 106.27, latitude: 38.47, wav: 8 }
+  },
+  {
+    key: 'south',
+    label: '南方双季稻(南昌)',
+    hint: '高温多雨，需排涝',
+    payload: { longitude: 115.89, latitude: 28.68, wav: 18 }
+  }
+]
+
+const presetKey = ref('chahayang')
+
+function applyPreset(key) {
+  const preset = presets.find(item => item.key === key)
+  if (!preset) return
+  form.longitude = preset.payload.longitude
+  form.latitude = preset.payload.latitude
+  form.site.wav = preset.payload.wav
+}
 
 const formRef = ref(null)
 const form = reactive(defaultForm())
@@ -347,6 +420,18 @@ function resetForm() {
       linear-gradient(120deg, rgba(37, 99, 235, 0.92), rgba(15, 118, 110, 0.86)),
       url('https://images.unsplash.com/photo-1536304993881-ff6e9eefa2a6?auto=format&fit=crop&w=1600&q=80') center/cover;
   }
+}
+
+.kpi-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpi-warn {
+  color: #d97706;
+  font-size: 14px;
+  cursor: help;
 }
 
 .page-layout {

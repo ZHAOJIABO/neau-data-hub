@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic.alias_generators import to_camel
 
 DEFAULT_WATER_SOIL_ZONES = [
     {
@@ -130,6 +130,8 @@ class WaterSoilZoneInputModel(BaseModel):
 class WaterSoilCropInputModel(BaseModel):
     """作物经济、产量、水氮参数。"""
 
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
     crop: Literal['rice', 'corn', 'soybean'] | str = Field(description='作物编码：rice/corn/soybean')
     crop_name: Optional[str] = Field(default=None, description='作物名称')
     min_area_ratio: float = Field(default=0.0, ge=0, le=1, description='每个分区内该作物最小面积比例')
@@ -165,45 +167,8 @@ class WaterSoilResourceOptimizeRequest(BaseModel):
         description='灌区分区列表，默认内置14个管理区',
     )
     crops: List[WaterSoilCropInputModel] = Field(
-        default_factory=lambda: [
-            WaterSoilCropInputModel(
-                crop='rice',
-                crop_name='水稻',
-                yield_kg_per_ha=9255.56,
-                price_yuan_per_kg=3.16,
-                cost_yuan_per_ha=8400,
-                water_quota_m3_per_ha=8000,
-                nitrogen_min_kg_ha=80,
-                nitrogen_max_kg_ha=250,
-                nitrogen_productivity_coeff=1.0,
-                water_productivity_coeff=1.0,
-            ),
-            WaterSoilCropInputModel(
-                crop='corn',
-                crop_name='玉米',
-                yield_kg_per_ha=5269.44,
-                price_yuan_per_kg=2.25,
-                cost_yuan_per_ha=7200,
-                water_quota_m3_per_ha=1900,
-                nitrogen_min_kg_ha=70,
-                nitrogen_max_kg_ha=230,
-                nitrogen_productivity_coeff=1.05,
-                water_productivity_coeff=1.03,
-            ),
-            WaterSoilCropInputModel(
-                crop='soybean',
-                crop_name='大豆',
-                yield_kg_per_ha=5945.0,
-                price_yuan_per_kg=5.4,
-                cost_yuan_per_ha=3000,
-                water_quota_m3_per_ha=1700,
-                nitrogen_min_kg_ha=40,
-                nitrogen_max_kg_ha=180,
-                nitrogen_productivity_coeff=1.08,
-                water_productivity_coeff=1.05,
-            ),
-        ],
-        description='作物参数列表，默认包含水稻、玉米、大豆',
+        default_factory=list,
+        description='作物参数列表，必填；新版需在前端配置',
     )
     stages: List[WaterSoilStageInputModel] = Field(
         default_factory=list,
@@ -218,3 +183,11 @@ class WaterSoilResourceOptimizeRequest(BaseModel):
     pref_weight_efficiency: float = Field(default=0.25, ge=0, description='先验权重：用水效率')
     pref_weight_nitrogen_efficiency: float = Field(default=0.15, ge=0, description='先验权重：氮肥利用效率')
     alpha: float = Field(default=0.5, ge=0, le=1, description='先验权重与熵权混合系数')
+
+    @model_validator(mode='after')
+    def validate_crops_and_total_water(self) -> 'WaterSoilResourceOptimizeRequest':
+        if not self.crops:
+            raise ValueError('作物参数列表 crops 不能为空，前端必须传入作物配置')
+        if self.total_water_available is None:
+            raise ValueError('灌区总可供水量 total_water_available 不能为空，前端必须传入')
+        return self

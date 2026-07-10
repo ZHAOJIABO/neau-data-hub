@@ -30,9 +30,9 @@ class RiceGrowthSimulationRequest(BaseModel):
     plant_start_date: str = Field(description='作物开始日期 YYYY-MM-DD')
     plant_end_date: str = Field(description='作物结束/收获日期 YYYY-MM-DD')
     irrigation_end_date: str = Field(description='灌溉结束日期 YYYY-MM-DD')
-    soil_moisture_threshold: float = Field(default=0.32, gt=0, lt=1, description='土壤水分触发阈值')
+    soil_moisture_threshold: float = Field(default=0.22, gt=0.16, lt=0.42, description='土壤水分触发阈值(绝对体积含水量, 推荐 0.20-0.25)')
     irrigation_efficiency: float = Field(default=0.75, gt=0, le=1, description='灌溉效率')
-    single_irrigation_amount: float = Field(default=3.0, ge=0, description='单次灌溉水层(cm)')
+    single_irrigation_amount: float = Field(default=1.5, gt=0, le=5, description='单次灌溉水层(cm)，配合多级阈值采用小水量分次灌溉')
     site: RiceGrowthSiteParamsModel = Field(default_factory=RiceGrowthSiteParamsModel, description='站点参数')
     variety_name: str = Field(default='Rice_IR72_WS', description='rice.crop 中的水稻品种名')
 

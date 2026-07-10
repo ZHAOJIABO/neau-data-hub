@@ -33,7 +33,7 @@
             <div class="card-header">
               <div>
                 <div class="card-title">参数配置</div>
-                <div class="card-desc">默认内置论文数据映射的14分区，可调整算法超参和目标权重。</div>
+                <div class="card-desc">分区、作物参数、水量约束均可自定义。</div>
               </div>
               <el-tag :type="resultError ? 'danger' : result ? 'success' : 'info'">
                 {{ resultError ? '接口异常' : result ? '方案已生成' : '待提交' }}
@@ -46,22 +46,87 @@
               <el-input v-model="form.apiKey" type="password" show-password clearable placeholder="X-Irrigation-Api-Key" />
             </el-form-item>
 
-            <el-divider content-position="left">14分区默认参数</el-divider>
-            <el-table :data="zones" border size="small" stripe max-height="320" class="zone-config-table">
-              <el-table-column prop="zone_name" label="分区" width="92" fixed />
-              <el-table-column label="面积(ha)" min-width="132" align="right">
+            <el-divider content-position="left">作物参数</el-divider>
+            <el-table :data="crops" border size="small" stripe max-height="280" class="crop-config-table">
+              <el-table-column prop="crop_name" label="作物" width="80" fixed />
+              <el-table-column label="产量<br>(kg/ha)" min-width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-model="row.land_area" :min="1" :step="10" controls-position="right" />
+                  <el-input-number v-model="row.yield_kg_per_ha" :min="0" :step="100" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="地表水(m³)" min-width="150" align="right">
+              <el-table-column label="单价<br>(元/kg)" min-width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-model="row.surface_water_available" :min="0" :step="100000" controls-position="right" />
+                  <el-input-number v-model="row.price_yuan_per_kg" :min="0" :step="0.1" :precision="2" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="地下水(m³)" min-width="150" align="right">
+              <el-table-column label="成本<br>(元/ha)" min-width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-model="row.groundwater_available" :min="0" :step="10000" controls-position="right" />
+                  <el-input-number v-model="row.cost_yuan_per_ha" :min="0" :step="100" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="灌溉定额<br>(m³/ha)" min-width="95" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.water_quota_m3_per_ha" :min="1" :step="100" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="施氮下限<br>(kg/ha)" min-width="95" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.nitrogen_min_kg_ha" :min="0" :step="5" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="施氮上限<br>(kg/ha)" min-width="95" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.nitrogen_max_kg_ha" :min="1" :step="5" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="氮效系数" min-width="80" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.nitrogen_productivity_coeff" :min="0.01" :step="0.05" :precision="2" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="水效系数" min-width="80" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.water_productivity_coeff" :min="0.01" :step="0.05" :precision="2" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="氮成本<br>(元/kg)" min-width="85" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.nitrogen_cost_yuan_per_kg" :min="0" :step="0.1" :precision="2" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <el-divider content-position="left">全局水量约束</el-divider>
+            <el-form-item label="灌区总可供水量 (m³)" required>
+              <el-input-number v-model="form.totalWaterAvailable" :min="1" :step="100000" style="width: 100%" />
+            </el-form-item>
+
+            <el-divider content-position="left">14分区参数</el-divider>
+            <el-table :data="zones" border size="small" stripe max-height="360" class="zone-config-table">
+              <el-table-column prop="zone_name" label="分区" width="80" fixed />
+              <el-table-column label="面积<br>(ha)" min-width="108" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.land_area" :min="1" :step="10" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="最小面积<br>(ha)" min-width="108" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.min_area" :min="0" :step="10" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="最大面积<br>(ha)" min-width="108" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.max_area" :min="0" :step="10" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="地表水<br>(m³)" min-width="120" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.surface_water_available" :min="0" :step="100000" controls-position="right" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="地下水<br>(m³)" min-width="120" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.groundwater_available" :min="0" :step="10000" controls-position="right" size="small" />
                 </template>
               </el-table-column>
             </el-table>
@@ -346,11 +411,62 @@ const defaultZones = [
   ['Z14', '长吉岗', 5459.97, 33879440, 6701584]
 ]
 
+const defaultCrops = [
+  {
+    crop: 'rice',
+    crop_name: '水稻',
+    min_area_ratio: 0.0,
+    max_area_ratio: 1.0,
+    yield_kg_per_ha: 9255.56,
+    price_yuan_per_kg: 3.16,
+    cost_yuan_per_ha: 8400,
+    water_quota_m3_per_ha: 8000,
+    nitrogen_min_kg_ha: 80,
+    nitrogen_max_kg_ha: 250,
+    nitrogen_productivity_coeff: 1.0,
+    water_productivity_coeff: 1.0,
+    nitrogen_cost_yuan_per_kg: 1.0
+  },
+  {
+    crop: 'corn',
+    crop_name: '玉米',
+    min_area_ratio: 0.0,
+    max_area_ratio: 1.0,
+    yield_kg_per_ha: 5269.44,
+    price_yuan_per_kg: 2.25,
+    cost_yuan_per_ha: 7200,
+    water_quota_m3_per_ha: 1900,
+    nitrogen_min_kg_ha: 70,
+    nitrogen_max_kg_ha: 230,
+    nitrogen_productivity_coeff: 1.05,
+    water_productivity_coeff: 1.03,
+    nitrogen_cost_yuan_per_kg: 1.0
+  },
+  {
+    crop: 'soybean',
+    crop_name: '大豆',
+    min_area_ratio: 0.0,
+    max_area_ratio: 1.0,
+    yield_kg_per_ha: 5945.0,
+    price_yuan_per_kg: 5.4,
+    cost_yuan_per_ha: 3000,
+    water_quota_m3_per_ha: 1700,
+    nitrogen_min_kg_ha: 40,
+    nitrogen_max_kg_ha: 180,
+    nitrogen_productivity_coeff: 1.08,
+    water_productivity_coeff: 1.05,
+    nitrogen_cost_yuan_per_kg: 1.0
+  }
+]
+
+const crops = reactive(defaultCrops.map(item => ({ ...item })))
+
 const zones = reactive(defaultZones.map(([zone_id, zone_name, land_area, surface_water_available, groundwater_available]) => ({
   zone_id,
   zone_name,
   land_area,
   min_area: Number((land_area * 0.75).toFixed(4)),
+  max_area: land_area,
   surface_water_available,
   groundwater_available
 })))
@@ -372,6 +488,7 @@ let pareto3dChart = null
 
 const form = reactive({
   apiKey: IRRIGATION_API_KEY,
+  totalWaterAvailable: 0,
   popSize: 80,
   nGen: 60,
   seed: 1,
@@ -382,9 +499,19 @@ const form = reactive({
   alpha: 0.5
 })
 
-const canSubmit = computed(() => form.apiKey.trim() && zones.every(item =>
-  item.land_area > 0 && (item.surface_water_available + item.groundwater_available) > 0
-))
+const canSubmit = computed(() => {
+  if (!form.apiKey.trim()) return false
+  if (form.totalWaterAvailable <= 0) return false
+  if (!zones.every(item => item.land_area > 0 && (item.surface_water_available + item.groundwater_available) > 0)) return false
+  if (!crops.every(item =>
+    item.yield_kg_per_ha > 0 &&
+    item.price_yuan_per_kg > 0 &&
+    item.water_quota_m3_per_ha > 0 &&
+    item.nitrogen_max_kg_ha > 0 &&
+    item.nitrogen_min_kg_ha <= item.nitrogen_max_kg_ha
+  )) return false
+  return true
+})
 
 const objectives = computed(() => result.value?.summary?.objective_values || {})
 const paretoSelectedCount = computed(() => (result.value?.pareto || []).filter(item => item.selected).length)
@@ -611,14 +738,18 @@ function renderCharts() {
 function buildPayload() {
   return {
     mode: 'water-soil-resource',
+    crops: crops.map(item => ({ ...item })),
     zones: zones.map(item => ({
       zone_id: item.zone_id,
       zone_name: item.zone_name,
       land_area: item.land_area,
-      min_area: Number((item.land_area * 0.75).toFixed(4)),
+      min_area: item.min_area,
+      max_area: item.max_area || item.land_area,
       surface_water_available: item.surface_water_available,
       groundwater_available: item.groundwater_available
     })),
+    stages: [],
+    total_water_available: form.totalWaterAvailable,
     pop_size: form.popSize,
     n_gen: form.nGen,
     seed: form.seed,
@@ -683,10 +814,14 @@ onUnmounted(() => {
 .card-desc { margin-top: 6px; color: var(--text-secondary); line-height: 1.6; }
 .resource-form :deep(.el-form-item) { margin-bottom: 14px; }
 .resource-form :deep(.el-form-item__label) { font-size: 0.8em; color: var(--text-regular); padding: 0 0 4px; line-height: 1.3; font-weight: 500; }
-.zone-config-table :deep(.el-input-number) { width: 118px; }
+.zone-config-table :deep(.el-input-number),
+.crop-config-table :deep(.el-input-number) { width: 100%; min-width: 70px; }
 .zone-config-table :deep(.el-input-number__decrease),
-.zone-config-table :deep(.el-input-number__increase) { display: none; }
-.zone-config-table :deep(.el-input__wrapper) { padding-left: 6px; padding-right: 6px; }
+.zone-config-table :deep(.el-input-number__increase),
+.crop-config-table :deep(.el-input-number__decrease),
+.crop-config-table :deep(.el-input-number__increase) { display: none; }
+.zone-config-table :deep(.el-input__wrapper),
+.crop-config-table :deep(.el-input__wrapper) { padding-left: 4px; padding-right: 4px; }
 .action-row { display: flex; gap: 10px; margin-top: 12px; }
 .action-primary { flex: 1; }
 .placeholder { padding: 56px 20px; text-align: center; background: var(--surface-soft-bg); border-radius: 18px; border: 1px dashed var(--hairline-color); }

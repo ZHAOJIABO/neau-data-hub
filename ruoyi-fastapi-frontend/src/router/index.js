@@ -96,8 +96,73 @@ export const constantRoutes = [
         meta: { title: '作物生长模拟', icon: 'tree' }
       }
     ]
+  },
+  {
+    path: '/model/irrigation',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/model/irrigation/index'),
+        name: 'Irrigation',
+        meta: { title: '灌溉决策', icon: 'cloudy' }
+      }
+    ]
+  },
+  {
+    path: '/model/canal/optimize',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/model/canalOptimize/index'),
+        name: 'CanalOptimize',
+        meta: { title: '渠系优化配水', icon: 'guide' }
+      }
+    ]
+  },
+  {
+    path: '/model/canal/kinematic',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/model/canalKinematic/index'),
+        name: 'CanalKinematic',
+        meta: { title: '渠系水动力学', icon: 'histogram' }
+      }
+    ]
+  },
+  {
+    path: '/model/water-soil-resource',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/model/waterSoilResource/index'),
+        name: 'WaterSoilResource',
+        meta: { title: '水土资源优化配置', icon: 'tree-table' }
+      }
+    ]
+  },
+  {
+    path: '/model/water-right-allocation',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/model/waterRightAllocation/index'),
+        name: 'WaterRightAllocation',
+        meta: { title: '初始水权分配', icon: 'money' }
+      }
+    ]
   }
-]
+] 
 
 // 动态路由，基于用户权限动态去加载
 export const dynamicRoutes = [
