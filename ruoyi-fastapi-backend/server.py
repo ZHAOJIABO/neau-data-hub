@@ -15,7 +15,7 @@ from config.get_scheduler import SchedulerUtil
 from exceptions.handle import handle_exception
 from middlewares.handle import handle_middleware
 from module_admin.service.log_service import LogAggregatorService
-from module_irrigation.service.irrigation_service import IrrigationService
+from module_model.service.irrigation_service import IrrigationService
 from sub_applications.handle import handle_sub_applications
 from utils.common_util import worship
 from utils.log_util import logger
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info('灌溉决策模型加载完成')
 
         # 启动时加载渠系数据单例（直接从 DB 加载；若 DB 无数据则跳过，由管理接口导入）
-        from module_irrigation.model.canals_data import CanalsData
+        from module_model.model.canals_data import CanalsData
         from module_agriculture.service.canal_service import CanalService
         from config.get_db import AsyncSessionLocal
 

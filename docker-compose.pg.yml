@@ -28,6 +28,7 @@ services:
       - ./scripts:/app/datahub_scripts:ro
       - ${NEAU_DATA_DIR:-/root/workspace/neau-data-hub/data}:/app/data:ro
       - ./data_assets:/app/data_assets
+      - ./ruoyi-fastapi-backend/models/crop_growth:/app/models/crop_growth:ro
     depends_on:
       ruoyi-pg:
         condition: service_healthy

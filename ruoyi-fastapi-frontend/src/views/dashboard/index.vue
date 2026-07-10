@@ -256,7 +256,7 @@
           </div>
         </router-link>
 
-        <router-link to="#" class="model-card">
+        <router-link to="/model/water-soil-resource" class="model-card">
           <div class="model-card-icon resource-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
@@ -287,7 +287,7 @@
           </div>
         </router-link>
 
-        <router-link to="#" class="model-card">
+        <router-link to="/model/crop-growth" class="model-card">
           <div class="model-card-icon crop-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M12 22V8M5 12H2a10 10 0 0 0 20 0h-3"/>

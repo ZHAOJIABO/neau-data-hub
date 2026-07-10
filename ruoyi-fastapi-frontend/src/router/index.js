@@ -83,6 +83,19 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/model/crop-growth',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/model/cropGrowth/index'),
+        name: 'CropGrowth',
+        meta: { title: '作物生长模拟', icon: 'tree' }
+      }
+    ]
   }
 ]
 
