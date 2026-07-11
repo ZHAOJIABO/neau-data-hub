@@ -49,22 +49,22 @@
             <el-divider content-position="left">作物参数</el-divider>
             <el-table :data="crops" border size="small" stripe max-height="240" class="crop-config-table">
               <el-table-column prop="crop_name" label="作物" width="80" fixed />
-              <el-table-column label="产量<br>(kg/ha)" min-width="100" align="right">
+              <el-table-column label="产量 (kg/ha)" min-width="100" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.yield_kg_per_ha" :min="0" :step="100" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="单价<br>(元/kg)" min-width="95" align="right">
+              <el-table-column label="单价 (元/kg)" min-width="95" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.price_yuan_per_kg" :min="0" :step="0.1" :precision="2" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="成本<br>(元/ha)" min-width="90" align="right">
+              <el-table-column label="成本 (元/ha)" min-width="90" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.cost_yuan_per_ha" :min="0" :step="100" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="灌溉定额<br>(m³/ha)" min-width="100" align="right">
+              <el-table-column label="灌溉定额 (m³/ha)" min-width="100" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.water_quota_m3_per_ha" :min="1" :step="100" controls-position="right" size="small" />
                 </template>
@@ -115,7 +115,7 @@
             <el-divider content-position="left">14分区参数</el-divider>
             <el-table :data="zones" border size="small" stripe max-height="320" class="zone-config-table">
               <el-table-column prop="zone_name" label="分区" width="80" fixed />
-              <el-table-column label="面积<br>(ha)" min-width="110" align="right">
+              <el-table-column label="面积 (ha)" min-width="110" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.land_area" :min="1" :step="10" controls-position="right" size="small" />
                 </template>
@@ -183,19 +183,19 @@
           <div class="kpi-row">
             <div class="kpi-box">
               <div class="kpi-label">市场出清价 p*</div>
-              <div class="kpi-value">{{ fmtNumber(clearingPrice, 3) }}<span>元/m³</span></div>
+              <div class="kpi-value">{{ fmtNumber(clearingPrice, 2) }}<span>元/m³</span></div>
             </div>
             <div class="kpi-box">
               <div class="kpi-label">总交易量</div>
-              <div class="kpi-value">{{ fmtNumber(totalTraded, 1) }}<span>万 m³</span></div>
+              <div class="kpi-value">{{ fmtNumber(totalTraded, 2) }}<span>万 m³</span></div>
             </div>
             <div class="kpi-box">
               <div class="kpi-label">社会福利</div>
-              <div class="kpi-value">{{ fmtNumber(socialWelfare, 1) }}<span>万元</span></div>
+              <div class="kpi-value">{{ fmtNumber(socialWelfare, 2) }}<span>万元</span></div>
             </div>
             <div class="kpi-box">
               <div class="kpi-label">公平性指数</div>
-              <div class="kpi-value">{{ fmtNumber(fairness, 4) }}</div>
+              <div class="kpi-value">{{ fmtNumber(fairness, 2) }}</div>
             </div>
             <div class="kpi-box">
               <div class="kpi-label">卖家 / 买家</div>
@@ -205,7 +205,7 @@
             </div>
             <div class="kpi-box">
               <div class="kpi-label">交易成本</div>
-              <div class="kpi-value">{{ fmtNumber(txCost, 1) }}<span>万元</span></div>
+              <div class="kpi-value">{{ fmtNumber(txCost, 2) }}<span>万元</span></div>
             </div>
             <div class="kpi-box">
               <div class="kpi-label">上层迭代</div>
@@ -213,7 +213,7 @@
             </div>
             <div class="kpi-box">
               <div class="kpi-label">节水总量</div>
-              <div class="kpi-value">{{ fmtNumber(waterSaved, 1) }}<span>万 m³</span></div>
+              <div class="kpi-value">{{ fmtNumber(waterSaved, 2) }}<span>万 m³</span></div>
             </div>
           </div>
 
@@ -368,20 +368,20 @@ const { proxy } = getCurrentInstance()
 const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
 
 const defaultZones = [
-  ['Z01', '红河', 2865.02, 36259380, 4696734],
-  ['Z02', '万发', 3135.47, 39296070, 4873331],
-  ['Z03', '金光', 3398.08, 41055570, 5091537],
-  ['Z04', '稻花香', 3550.21, 30910780, 3833423],
-  ['Z05', '发展', 2672.96, 44974950, 5877602],
-  ['Z06', '金星', 3212.89, 39945480, 5253868],
-  ['Z07', '太平湖', 1761.67, 43645990, 5412790],
-  ['Z08', '海洋', 3889.15, 64301350, 8974380],
-  ['Z09', '新立', 3454.23, 19992150, 2979341],
-  ['Z10', '丰收', 3774.23, 37951930, 4006637],
-  ['Z11', '二十八方', 5560.37, 26396760, 3273614],
-  ['Z12', '联合', 1795.09, 42364060, 1153810],
-  ['Z13', '金边', 2139.52, 7026099, 871347],
-  ['Z14', '长吉岗', 5459.97, 33879440, 6701584]
+  ['Z01', '红河',    2865.02, 18500000, 3200000],
+  ['Z02', '万发',    3135.47, 21200000, 3500000],
+  ['Z03', '金光',    3398.08, 22800000, 3800000],
+  ['Z04', '稻花香',  3550.21, 15600000, 2800000],
+  ['Z05', '发展',    2672.96, 24800000, 4400000],
+  ['Z06', '金星',    3212.89, 21600000, 4100000],
+  ['Z07', '太平湖',  1761.67, 23600000, 3900000],
+  ['Z08', '海洋',    3889.15, 39500000, 8500000],
+  ['Z09', '新立',    3454.23, 9800000,  2600000],
+  ['Z10', '丰收',    3774.23, 19800000, 3600000],
+  ['Z11', '二十八方', 5560.37, 13200000, 3000000],
+  ['Z12', '联合',    1795.09, 23400000, 1100000],
+  ['Z13', '金边',    2139.52, 3200000,  800000],
+  ['Z14', '长吉岗',  5459.97, 17600000, 6100000]
 ]
 
 const defaultCrops = [
@@ -419,8 +419,9 @@ const zones = reactive(defaultZones.map(([zone_id, zone_name, land_area, surface
   land_area,
   surface_water_available,
   groundwater_available,
-  water_demand_m3: Number((land_area * 8000).toFixed(0)),
-  water_saving_potential_m3: 0
+  water_demand_m3: Math.round(land_area * 7200),
+  water_saving_potential_m3: Math.round(land_area * 600),
+  min_self_use_ratio: 0.55
 })))
 
 const submitting = ref(false)
@@ -440,13 +441,13 @@ let tradeFlowChart = null
 
 const form = reactive({
   apiKey: IRRIGATION_API_KEY,
-  initialTotalWater: 300000000,
-  transactionCostRate: 0.02,
-  priceFloor: 0.5,
+  initialTotalWater: 260000000,
+  transactionCostRate: 0.08,
+  priceFloor: 1.0,
   priceCeiling: 8.0,
-  reservePrice: 1.5,
-  fairnessWeight: 0.3,
-  savingIncentiveWeight: 0.2,
+  reservePrice: 5.2,
+  fairnessWeight: 0.35,
+  savingIncentiveWeight: 0.45,
   useDefaultCrops: true,
   riceShare: 0.5,
   cornShare: 0.3,
@@ -524,7 +525,10 @@ function renderRolePie() {
     counts[role] = (counts[role] || 0) + 1
   })
   rolePieChart.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    tooltip: {
+      trigger: 'item',
+      formatter: params => `${params.name}: ${params.value} 个分区 (${params.percent.toFixed(2)}%)`
+    },
     legend: { bottom: 0 },
     color: ['#22c55e', '#f97316', '#94a3b8'],
     series: [{
@@ -547,11 +551,19 @@ function renderInitialUsed() {
   if (!initialUsedChart) return
   const rows = result.value?.zone_outcomes || []
   initialUsedChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      valueFormatter: val => Number(val || 0).toFixed(2)
+    },
     legend: { top: 0 },
     grid: { left: 56, right: 36, top: 30, bottom: 56 },
     xAxis: { type: 'category', data: rows.map(item => item.zone_name), axisLabel: { interval: 0, rotate: 35 } },
-    yAxis: { type: 'value', name: '水量(万m³)' },
+    yAxis: {
+      type: 'value',
+      name: '水量(万m³)',
+      axisLabel: { formatter: v => Number(v).toFixed(2) }
+    },
     color: CHART_COLORS,
     series: [
       { name: '初始水权', type: 'bar', data: rows.map(item => Number(item.initial_right_m3 || 0) / 1e4) },
@@ -567,10 +579,18 @@ function renderProfit() {
   const data = rows.map(item => Number(item.net_profit_yuan || 0) / 1e4)
   const isAllZero = data.every(v => Math.abs(v) < 1e-6)
   profitChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      valueFormatter: val => Number(val || 0).toFixed(2)
+    },
     grid: { left: 56, right: 36, top: 28, bottom: 56 },
     xAxis: { type: 'category', data: rows.map(item => item.zone_name), axisLabel: { interval: 0, rotate: 35 } },
-    yAxis: { type: 'value', name: '净收益(万元)' },
+    yAxis: {
+      type: 'value',
+      name: '净收益(万元)',
+      axisLabel: { formatter: v => Number(v).toFixed(2) }
+    },
     series: [{
       name: '净收益',
       type: 'bar',
@@ -596,7 +616,10 @@ function renderLeader() {
     return
   }
   leaderChart.setOption({
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      valueFormatter: val => Number(val || 0).toFixed(2)
+    },
     legend: { top: 0 },
     grid: { left: 60, right: 60, top: 36, bottom: 56 },
     xAxis: {
@@ -605,8 +628,18 @@ function renderLeader() {
       data: history.map(item => Number(item.reserve_price || 0).toFixed(2))
     },
     yAxis: [
-      { type: 'value', name: '社会福利', position: 'left', axisLabel: { fontSize: 11 } },
-      { type: 'value', name: '总交易量(万m³)', position: 'right', axisLabel: { fontSize: 11 } }
+      {
+        type: 'value',
+        name: '社会福利(万元)',
+        position: 'left',
+        axisLabel: { fontSize: 11, formatter: v => Number(v).toFixed(2) }
+      },
+      {
+        type: 'value',
+        name: '总交易量(万m³)',
+        position: 'right',
+        axisLabel: { fontSize: 11, formatter: v => Number(v).toFixed(2) }
+      }
     ],
     color: [CHART_COLORS[0], CHART_COLORS[2]],
     series: [
@@ -623,10 +656,18 @@ function renderTradeFlow() {
   const labels = pairs.map(item => `${item.seller_zone_name} → ${item.buyer_zone_name}`)
   const amounts = pairs.map(item => Number(item.amount_m3 || 0) / 1e4)
   tradeFlowChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      valueFormatter: val => Number(val || 0).toFixed(2)
+    },
     grid: { left: 60, right: 28, top: 28, bottom: 96 },
     xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, interval: 0, fontSize: 10 } },
-    yAxis: { type: 'value', name: '水量(万m³)' },
+    yAxis: {
+      type: 'value',
+      name: '水量(万m³)',
+      axisLabel: { formatter: v => Number(v).toFixed(2) }
+    },
     color: CHART_COLORS,
     series: [{ name: '水量', type: 'bar', data: amounts, itemStyle: { color: CHART_COLORS[2] } }]
   })
@@ -643,23 +684,31 @@ function renderCharts() {
 
 function buildPayload() {
   const totalLandArea = zones.reduce((s, z) => s + Number(z.land_area || 0), 0) || 1
-  let cropMix = null
-  if (!form.useDefaultCrops) {
-    const sum = form.riceShare + form.cornShare + form.soybeanShare || 1
-    cropMix = {
-      rice: form.riceShare / sum,
-      corn: form.cornShare / sum,
-      soybean: form.soybeanShare / sum
-    }
+  // 各分区按 zone_id 静态划分作物结构，构造边际产值差异：
+  // - 缺水/产粮区（Z01-Z07）：玉米/大豆为主 → 边际产值高 → 倾向买水
+  // - 富水/湿地型（Z08-Z14）：水稻为主 → 边际产值低 → 倾向卖水
+  const cropMixByZone = {
+    Z01: { rice: 0.15, corn: 0.45, soybean: 0.40 },
+    Z02: { rice: 0.20, corn: 0.50, soybean: 0.30 },
+    Z03: { rice: 0.10, corn: 0.55, soybean: 0.35 },
+    Z04: { rice: 0.25, corn: 0.50, soybean: 0.25 },
+    Z05: { rice: 0.10, corn: 0.40, soybean: 0.50 },
+    Z06: { rice: 0.15, corn: 0.45, soybean: 0.40 },
+    Z07: { rice: 0.30, corn: 0.50, soybean: 0.20 },
+    Z08: { rice: 0.80, corn: 0.15, soybean: 0.05 },
+    Z09: { rice: 0.75, corn: 0.20, soybean: 0.05 },
+    Z10: { rice: 0.70, corn: 0.20, soybean: 0.10 },
+    Z11: { rice: 0.85, corn: 0.10, soybean: 0.05 },
+    Z12: { rice: 0.80, corn: 0.15, soybean: 0.05 },
+    Z13: { rice: 0.70, corn: 0.20, soybean: 0.10 },
+    Z14: { rice: 0.90, corn: 0.07, soybean: 0.03 }
   }
   return {
     crops: crops.map(item => ({ ...item })),
     zones: zones.map(item => {
       const ratio = Number(item.land_area || 0) / totalLandArea
-      const mixed = cropMix || {
-        rice: 0.45,
-        corn: 0.25,
-        soybean: 0.30
+      const mixed = cropMixByZone[item.zone_id] || {
+        rice: 0.5, corn: 0.3, soybean: 0.2
       }
       const payload = {
         zone_id: item.zone_id,

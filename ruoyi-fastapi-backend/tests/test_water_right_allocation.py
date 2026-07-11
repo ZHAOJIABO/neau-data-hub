@@ -358,5 +358,84 @@ class FairnessTest(unittest.TestCase):
         self.assertEqual(compute_fairness_index(v), 0.0)
 
 
+class DefaultFrontendScenarioTest(unittest.TestCase):
+    def test_default_frontend_has_buyers_and_sellers(self):
+        ZONES_RAW = [
+            ("Z01", 2865.02, 18500000, 3200000),
+            ("Z02", 3135.47, 21200000, 3500000),
+            ("Z03", 3398.08, 22800000, 3800000),
+            ("Z04", 3550.21, 15600000, 2800000),
+            ("Z05", 2672.96, 24800000, 4400000),
+            ("Z06", 3212.89, 21600000, 4100000),
+            ("Z07", 1761.67, 23600000, 3900000),
+            ("Z08", 3889.15, 39500000, 8500000),
+            ("Z09", 3454.23, 9800000, 2600000),
+            ("Z10", 3774.23, 19800000, 3600000),
+            ("Z11", 5560.37, 13200000, 3000000),
+            ("Z12", 1795.09, 23400000, 1100000),
+            ("Z13", 2139.52, 3200000, 800000),
+            ("Z14", 5459.97, 17600000, 6100000),
+        ]
+        CM = {
+            "Z01": {"rice": 0.15, "corn": 0.45, "soybean": 0.40},
+            "Z02": {"rice": 0.20, "corn": 0.50, "soybean": 0.30},
+            "Z03": {"rice": 0.10, "corn": 0.55, "soybean": 0.35},
+            "Z04": {"rice": 0.25, "corn": 0.50, "soybean": 0.25},
+            "Z05": {"rice": 0.10, "corn": 0.40, "soybean": 0.50},
+            "Z06": {"rice": 0.15, "corn": 0.45, "soybean": 0.40},
+            "Z07": {"rice": 0.30, "corn": 0.50, "soybean": 0.20},
+            "Z08": {"rice": 0.80, "corn": 0.15, "soybean": 0.05},
+            "Z09": {"rice": 0.75, "corn": 0.20, "soybean": 0.05},
+            "Z10": {"rice": 0.70, "corn": 0.20, "soybean": 0.10},
+            "Z11": {"rice": 0.85, "corn": 0.10, "soybean": 0.05},
+            "Z12": {"rice": 0.80, "corn": 0.15, "soybean": 0.05},
+            "Z13": {"rice": 0.70, "corn": 0.20, "soybean": 0.10},
+            "Z14": {"rice": 0.90, "corn": 0.07, "soybean": 0.03},
+        }
+        zones_payload = []
+        for zid, land, surf, ground in ZONES_RAW:
+            zones_payload.append({
+                "zone_id": zid, "zone_name": zid,
+                "land_area": land,
+                "surface_water_available": surf,
+                "groundwater_available": ground,
+                "water_demand_m3": round(land * 7200),
+                "crop_mix": CM[zid],
+                "water_saving_potential_m3": round(land * 600),
+                "min_self_use_ratio": 0.55,
+            })
+        CROPS = [
+            {"crop": "rice", "crop_name": "R", "yield_kg_per_ha": 9255.56, "price_yuan_per_kg": 3.16, "cost_yuan_per_ha": 8400, "water_quota_m3_per_ha": 8000},
+            {"crop": "corn", "crop_name": "C", "yield_kg_per_ha": 5269.44, "price_yuan_per_kg": 2.25, "cost_yuan_per_ha": 7200, "water_quota_m3_per_ha": 1900},
+            {"crop": "soybean", "crop_name": "S", "yield_kg_per_ha": 5945.0, "price_yuan_per_kg": 5.4, "cost_yuan_per_ha": 3000, "water_quota_m3_per_ha": 1700},
+        ]
+        market = {
+            "initial_total_water_m3": 260000000,
+            "reserve_price_yuan_per_m3": 5.2,
+            "price_floor": 1.0,
+            "price_ceiling": 8.0,
+            "transaction_cost_rate": 0.08,
+            "fairness_weight": 0.35,
+            "saving_incentive_weight": 0.45,
+            "min_self_use_ratio": 0.0,
+        }
+        ctx = build_context(zones_payload, CROPS, market)
+        result = solve_water_right_allocation(ctx)
+        d = result.to_dict()
+        eq = d["equilibrium"]
+        sm = d["summary"]
+        print("\n=== DEFAULT FRONTEND ===")
+        print("clearing_price:", eq["clearing_price_yuan_per_m3"])
+        print("n_sellers:", eq["n_sellers"], "| n_buyers:", eq["n_buyers"])
+        print("total_traded (10k m3):", round(eq["total_traded_m3"] / 1e4, 2))
+        print("water_saved (10k m3):", round(sm["total_water_saved_m3"] / 1e4, 2))
+        print("social_welfare (10k yuan):", round(sm["total_social_welfare_yuan"] / 1e4, 2))
+        for row in d["zone_outcomes"]:
+            print(f"  {row['zone_id']} role={row['role']:<7} R={row['initial_right_m3']/1e4:>7.1f}  self={row['self_used_m3']/1e4:>7.1f}  buy={row['purchased_m3']/1e4:>6.1f}  sell={row['sold_m3']/1e4:>6.1f}")
+        self.assertGreater(eq["n_buyers"], 0)
+        self.assertGreater(eq["n_sellers"], 0)
+        self.assertGreater(eq["total_traded_m3"], 0.0)
+
+
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)
