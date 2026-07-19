@@ -45,6 +45,23 @@
             <el-form-item label="接口 API Key" required>
               <el-input v-model="form.apiKey" type="password" show-password clearable placeholder="X-Irrigation-Api-Key" />
             </el-form-item>
+            <el-form-item label="灌区选择">
+              <el-select
+                v-model="form.irrigationAreaCode"
+                filterable
+                clearable
+                placeholder="请选择灌区"
+                style="width: 100%"
+                @change="handleIrrigationAreaChange"
+              >
+                <el-option
+                  v-for="item in irrigationAreas"
+                  :key="item.irrigationAreaCode"
+                  :label="item.irrigationAreaName"
+                  :value="item.irrigationAreaCode"
+                />
+              </el-select>
+            </el-form-item>
 
             <el-divider content-position="left">作物参数</el-divider>
             <el-table :data="crops" border size="small" stripe max-height="240" class="crop-config-table">
@@ -113,7 +130,17 @@
             </el-row>
 
             <el-divider content-position="left">14分区参数</el-divider>
-            <el-table :data="zones" border size="small" stripe max-height="320" class="zone-config-table">
+            <el-table
+              v-loading="zoneLoading"
+              :data="zones"
+              border
+              size="small"
+              stripe
+              max-height="320"
+              class="zone-config-table"
+              element-loading-text="正在加载灌区分区数据"
+              empty-text="暂无分区数据"
+            >
               <el-table-column prop="zone_name" label="分区" width="80" fixed />
               <el-table-column label="面积 (ha)" min-width="110" align="right">
                 <template #default="{ row }">
@@ -356,16 +383,19 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { Promotion } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 
 import { runWaterRightAllocation } from '@/api/model/waterRightAllocation'
+import { listEnabledZones, listIrrigationAreas } from '@/api/agriculture/zone'
 
 defineOptions({ name: 'WaterRightAllocation' })
 
 const { proxy } = getCurrentInstance()
 const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
+const DEFAULT_AREA_CODE = 'chahayang'
+const DEFAULT_AREA_NAME = '查哈阳灌区'
 
 const defaultZones = [
   ['Z01', '红河',    2865.02, 18500000, 3200000],
@@ -413,20 +443,99 @@ const defaultCrops = [
 
 const crops = reactive(defaultCrops.map(item => ({ ...item })))
 
-const zones = reactive(defaultZones.map(([zone_id, zone_name, land_area, surface_water_available, groundwater_available]) => ({
-  zone_id,
-  zone_name,
-  land_area,
-  surface_water_available,
-  groundwater_available,
-  water_demand_m3: Math.round(land_area * 7200),
-  water_saving_potential_m3: Math.round(land_area * 600),
-  min_self_use_ratio: 0.55
-})))
+function buildDefaultZoneRows() {
+  return defaultZones.map(([zone_id, zone_name, land_area, surface_water_available, groundwater_available]) => ({
+    zone_id,
+    zone_name,
+    land_area,
+    surface_water_available,
+    groundwater_available,
+    water_demand_m3: Math.round(land_area * 7200),
+    water_saving_potential_m3: Math.round(land_area * 600),
+    min_self_use_ratio: 0.55
+  }))
+}
+
+const zones = reactive([])
+
+function resetZonesToDefault() {
+  zones.splice(0, zones.length, ...buildDefaultZoneRows())
+}
+
+function applyEnabledZones(rows) {
+  if (!Array.isArray(rows) || !rows.length) return
+  zones.splice(0, zones.length, ...rows.map(item => {
+    const landArea = Number(item.landArea ?? item.land_area ?? 0)
+    return {
+      zone_id: item.zoneId ?? item.zone_id,
+      zone_name: item.zoneName ?? item.zone_name,
+      land_area: landArea,
+      surface_water_available: Number(item.surfaceWaterAvailable ?? item.surface_water_available ?? 0),
+      groundwater_available: Number(item.groundwaterAvailable ?? item.groundwater_available ?? 0),
+      water_demand_m3: Math.round(landArea * 7200),
+      water_saving_potential_m3: Math.round(landArea * 600),
+      min_self_use_ratio: 0.55
+    }
+  }))
+}
+
+function normalizeIrrigationAreas(rows) {
+  return rows
+    .map(item => ({
+      irrigationAreaCode: item.irrigationAreaCode ?? item.irrigation_area_code ?? '',
+      irrigationAreaName: item.irrigationAreaName ?? item.irrigation_area_name ?? item.irrigationAreaCode ?? item.irrigation_area_code ?? ''
+    }))
+    .filter(item => item.irrigationAreaCode)
+}
+
+async function loadEnabledZones() {
+  if (!form.irrigationAreaCode) {
+    zones.splice(0, zones.length)
+    return
+  }
+  zoneLoading.value = true
+  zones.splice(0, zones.length)
+  try {
+    const response = await listEnabledZones(form.irrigationAreaCode)
+    const rows = Array.isArray(response?.data) ? response.data : response
+    if (Array.isArray(rows) && rows.length) {
+      applyEnabledZones(rows)
+    } else {
+      resetZonesToDefault()
+      proxy.$modal?.msgWarning?.('未加载到分区数据，已使用页面默认分区')
+    }
+  } catch (err) {
+    resetZonesToDefault()
+    proxy.$modal?.msgWarning?.('分区数据加载失败，已使用页面默认分区')
+  } finally {
+    zoneLoading.value = false
+  }
+}
+
+async function loadIrrigationAreas() {
+  try {
+    const response = await listIrrigationAreas()
+    const rows = Array.isArray(response?.data) ? response.data : response
+    if (Array.isArray(rows) && rows.length) irrigationAreas.value = normalizeIrrigationAreas(rows)
+  } catch (err) {
+    irrigationAreas.value = [{ irrigationAreaCode: DEFAULT_AREA_CODE, irrigationAreaName: DEFAULT_AREA_NAME }]
+  }
+}
+
+async function handleIrrigationAreaChange() {
+  resetResult()
+  if (!form.irrigationAreaCode) {
+    zones.splice(0, zones.length)
+    return
+  }
+  await loadEnabledZones()
+}
 
 const submitting = ref(false)
+const zoneLoading = ref(false)
 const result = ref(null)
 const resultError = ref('')
+const irrigationAreas = ref([])
 const rolePieRef = ref(null)
 const initialUsedRef = ref(null)
 const profitRef = ref(null)
@@ -441,6 +550,7 @@ let tradeFlowChart = null
 
 const form = reactive({
   apiKey: IRRIGATION_API_KEY,
+  irrigationAreaCode: '',
   initialTotalWater: 260000000,
   transactionCostRate: 0.08,
   priceFloor: 1.0,
@@ -456,6 +566,8 @@ const form = reactive({
 
 const canSubmit = computed(() => {
   if (!form.apiKey.trim()) return false
+  if (!form.irrigationAreaCode) return false
+  if (zoneLoading.value) return false
   if (form.initialTotalWater <= 0) return false
   if (form.priceFloor >= form.priceCeiling) return false
   if (form.reservePrice < form.priceFloor || form.reservePrice > form.priceCeiling) return false
@@ -704,6 +816,7 @@ function buildPayload() {
     Z14: { rice: 0.90, corn: 0.07, soybean: 0.03 }
   }
   return {
+    irrigationAreaCode: form.irrigationAreaCode,
     crops: crops.map(item => ({ ...item })),
     zones: zones.map(item => {
       const ratio = Number(item.land_area || 0) / totalLandArea
@@ -768,6 +881,9 @@ watch(result, async (val) => {
 })
 
 window.addEventListener('resize', resizeCharts)
+onMounted(() => {
+  loadIrrigationAreas()
+})
 onUnmounted(() => {
   window.removeEventListener('resize', resizeCharts)
   destroyCharts()

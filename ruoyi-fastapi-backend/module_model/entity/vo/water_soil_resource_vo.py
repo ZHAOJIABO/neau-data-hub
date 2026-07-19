@@ -161,10 +161,13 @@ class WaterSoilStageInputModel(BaseModel):
 class WaterSoilResourceOptimizeRequest(BaseModel):
     """灌区水土资源-水氮作物多目标优化配置请求。"""
 
+    model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
+
     mode: Literal['water-soil-resource'] = 'water-soil-resource'
+    irrigation_area_code: str = Field(default='chahayang', description='灌区编码')
     zones: List[WaterSoilZoneInputModel] = Field(
-        default_factory=lambda: [WaterSoilZoneInputModel(**item) for item in DEFAULT_WATER_SOIL_ZONES],
-        description='灌区分区列表，默认内置14个管理区',
+        default_factory=list,
+        description='灌区分区列表；为空时由接口从数据库加载启用分区',
     )
     crops: List[WaterSoilCropInputModel] = Field(
         default_factory=list,
@@ -174,7 +177,7 @@ class WaterSoilResourceOptimizeRequest(BaseModel):
         default_factory=list,
         description='兼容旧版字段；新版结果按全生育期输出',
     )
-    total_water_available: Optional[float] = Field(default=None, gt=0, description='灌区总可供水量 (m³)，为空则只约束各分区水源')
+    total_water_available: Optional[float] = Field(default=None, gt=0, description='自定义全局总用水上限 (m³)，独立于各分区水源约束')
     pop_size: int = Field(default=120, ge=10, description='NSGA-II 种群规模')
     n_gen: int = Field(default=100, ge=1, description='NSGA-II 迭代代数')
     seed: int = Field(default=1, ge=0, description='随机种子')
@@ -189,5 +192,5 @@ class WaterSoilResourceOptimizeRequest(BaseModel):
         if not self.crops:
             raise ValueError('作物参数列表 crops 不能为空，前端必须传入作物配置')
         if self.total_water_available is None:
-            raise ValueError('灌区总可供水量 total_water_available 不能为空，前端必须传入')
+            raise ValueError('自定义全局总用水上限 total_water_available 不能为空，前端必须传入')
         return self

@@ -10,9 +10,12 @@ from typing import Annotated
 
 from fastapi import Body
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.aspect.db_seesion import DBSessionDependency
 from common.aspect.irrigation_auth import irrigation_api_key_dependency
 from common.router import APIRouterPro
+from module_agriculture.service.zone_service import IrrigationZoneService
 from module_model.entity.vo.water_efficiency_evaluate_vo import WaterEfficiencyEvaluateRequest
 from module_model.service.water_efficiency_evaluate_service import WaterEfficiencyEvaluateService
 from utils.log_util import logger
@@ -36,6 +39,7 @@ async def evaluate_water_efficiency(
         WaterEfficiencyEvaluateRequest,
         Body(description='灌区农业水效评价 JSON 请求体'),
     ],
+    query_db: Annotated[AsyncSession, DBSessionDependency()],
 ) -> JSONResponse:
     """
     对灌区各分区历史用水效率进行综合评价，支持多时段横向对比。
@@ -52,8 +56,17 @@ async def evaluate_water_efficiency(
         payload.alpha,
     )
 
+    zone_names = await IrrigationZoneService.zone_name_map(query_db, payload.irrigation_area_code)
+    periods = []
+    for period in payload.periods:
+        period_data = period.model_dump()
+        for zone in period_data['zones']:
+            if not zone.get('zone_name') and zone.get('zone_id') in zone_names:
+                zone['zone_name'] = zone_names[zone['zone_id']]
+        periods.append(period_data)
+
     data = WaterEfficiencyEvaluateService.run_evaluate(
-        periods=[p.model_dump() for p in payload.periods],
+        periods=periods,
         indicator_weights=payload.indicator_weights,
         alpha=payload.alpha,
         grade_thresholds=payload.grade_thresholds,

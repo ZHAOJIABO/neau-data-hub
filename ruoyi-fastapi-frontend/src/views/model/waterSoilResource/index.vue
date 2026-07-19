@@ -49,36 +49,53 @@
             <el-form-item label="接口 API Key" required>
               <el-input v-model="form.apiKey" type="password" show-password clearable placeholder="X-Irrigation-Api-Key" />
             </el-form-item>
+            <el-form-item label="灌区选择">
+              <el-select
+                v-model="form.irrigationAreaCode"
+                filterable
+                clearable
+                placeholder="请选择灌区"
+                style="width: 100%"
+                @change="handleIrrigationAreaChange"
+              >
+                <el-option
+                  v-for="item in irrigationAreas"
+                  :key="item.irrigationAreaCode"
+                  :label="item.irrigationAreaName"
+                  :value="item.irrigationAreaCode"
+                />
+              </el-select>
+            </el-form-item>
 
             <el-divider content-position="left">作物参数</el-divider>
             <el-table :data="crops" border size="small" stripe max-height="280" class="crop-config-table">
               <el-table-column prop="crop_name" label="作物" width="80" fixed />
-              <el-table-column label="产量<br>(kg/ha)" min-width="90" align="right">
+              <el-table-column label="产量 (kg/ha)" min-width="100" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.yield_kg_per_ha" :min="0" :step="100" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="单价<br>(元/kg)" min-width="90" align="right">
+              <el-table-column label="单价 (元/kg)" min-width="100" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.price_yuan_per_kg" :min="0" :step="0.1" :precision="2" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="成本<br>(元/ha)" min-width="90" align="right">
+              <el-table-column label="成本 (元/ha)" min-width="100" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.cost_yuan_per_ha" :min="0" :step="100" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="灌溉定额<br>(m³/ha)" min-width="95" align="right">
+              <el-table-column label="灌溉定额 (m³/ha)" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.water_quota_m3_per_ha" :min="1" :step="100" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="施氮下限<br>(kg/ha)" min-width="95" align="right">
+              <el-table-column label="施氮下限 (kg/ha)" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.nitrogen_min_kg_ha" :min="0" :step="5" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="施氮上限<br>(kg/ha)" min-width="95" align="right">
+              <el-table-column label="施氮上限 (kg/ha)" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.nitrogen_max_kg_ha" :min="1" :step="5" controls-position="right" size="small" />
                 </template>
@@ -93,44 +110,76 @@
                   <el-input-number v-model="row.water_productivity_coeff" :min="0.01" :step="0.05" :precision="2" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="氮成本<br>(元/kg)" min-width="85" align="right">
+              <el-table-column label="氮成本 (元/kg)" min-width="110" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.nitrogen_cost_yuan_per_kg" :min="0" :step="0.1" :precision="2" controls-position="right" size="small" />
                 </template>
               </el-table-column>
             </el-table>
 
-            <el-divider content-position="left">全局水量约束</el-divider>
-            <el-form-item label="灌区总可供水量 (m³)" required>
-              <el-input-number v-model="form.totalWaterAvailable" :min="1" :step="100000" style="width: 100%" />
+            <el-divider content-position="left">自定义全局水量约束</el-divider>
+            <el-form-item label="全局总用水上限 (m³)" required>
+              <el-input-number
+                v-model="form.totalWaterAvailable"
+                :min="0"
+                :step="100000"
+                :disabled="zoneLoading"
+                placeholder="默认按分区水量汇总，可手动修改"
+                style="width: 100%"
+                @change="markTotalWaterCustomized"
+              />
             </el-form-item>
 
             <el-divider content-position="left">14分区参数</el-divider>
-            <el-table :data="zones" border size="small" stripe max-height="360" class="zone-config-table">
+            <el-table
+              v-loading="zoneLoading"
+              :data="zones"
+              border
+              size="small"
+              stripe
+              max-height="360"
+              class="zone-config-table"
+              element-loading-text="正在加载灌区分区数据"
+              empty-text="暂无分区数据"
+            >
               <el-table-column prop="zone_name" label="分区" width="80" fixed />
-              <el-table-column label="面积<br>(ha)" min-width="108" align="right">
+              <el-table-column label="面积 (ha)" min-width="110" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.land_area" :min="1" :step="10" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="最小面积<br>(ha)" min-width="108" align="right">
+              <el-table-column label="最小面积 (ha)" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.min_area" :min="0" :step="10" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="最大面积<br>(ha)" min-width="108" align="right">
+              <el-table-column label="最大面积 (ha)" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-model="row.max_area" :min="0" :step="10" controls-position="right" size="small" />
                 </template>
               </el-table-column>
-              <el-table-column label="地表水<br>(m³)" min-width="120" align="right">
+              <el-table-column label="地表水 (m³)" min-width="130" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-model="row.surface_water_available" :min="0" :step="100000" controls-position="right" size="small" />
+                  <el-input-number
+                    v-model="row.surface_water_available"
+                    :min="0"
+                    :step="100000"
+                    controls-position="right"
+                    size="small"
+                    @change="syncDefaultTotalWater"
+                  />
                 </template>
               </el-table-column>
-              <el-table-column label="地下水<br>(m³)" min-width="120" align="right">
+              <el-table-column label="地下水 (m³)" min-width="130" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-model="row.groundwater_available" :min="0" :step="10000" controls-position="right" size="small" />
+                  <el-input-number
+                    v-model="row.groundwater_available"
+                    :min="0"
+                    :step="10000"
+                    controls-position="right"
+                    size="small"
+                    @change="syncDefaultTotalWater"
+                  />
                 </template>
               </el-table-column>
             </el-table>
@@ -386,17 +435,20 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { Promotion } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import 'echarts-gl'
 
 import { runWaterSoilResourceOptimize } from '@/api/model/waterSoilResource'
+import { listEnabledZones, listIrrigationAreas } from '@/api/agriculture/zone'
 
 defineOptions({ name: 'WaterSoilResource' })
 
 const { proxy } = getCurrentInstance()
 const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
+const DEFAULT_AREA_CODE = 'chahayang'
+const DEFAULT_AREA_NAME = '查哈阳灌区'
 
 const defaultZones = [
   ['Z01', '红河', 2865.02, 36259380, 4696734],
@@ -465,19 +517,122 @@ const defaultCrops = [
 
 const crops = reactive(defaultCrops.map(item => ({ ...item })))
 
-const zones = reactive(defaultZones.map(([zone_id, zone_name, land_area, surface_water_available, groundwater_available]) => ({
-  zone_id,
-  zone_name,
-  land_area,
-  min_area: Number((land_area * 0.75).toFixed(4)),
-  max_area: land_area,
-  surface_water_available,
-  groundwater_available
-})))
+function buildDefaultZoneRows() {
+  return defaultZones.map(([zone_id, zone_name, land_area, surface_water_available, groundwater_available]) => ({
+    zone_id,
+    zone_name,
+    land_area,
+    min_area: Number((land_area * 0.75).toFixed(4)),
+    max_area: land_area,
+    surface_water_available,
+    groundwater_available
+  }))
+}
+
+const zones = reactive([])
+
+function calculateZoneWaterTotal() {
+  return Math.round(zones.reduce((sum, item) => {
+    return sum + Number(item.surface_water_available || 0) + Number(item.groundwater_available || 0)
+  }, 0))
+}
+
+function setDefaultTotalWaterFromZones() {
+  form.totalWaterAvailable = zones.length ? calculateZoneWaterTotal() : null
+}
+
+function syncDefaultTotalWater() {
+  if (!totalWaterCustomized.value) setDefaultTotalWaterFromZones()
+}
+
+function markTotalWaterCustomized() {
+  totalWaterCustomized.value = true
+}
+
+function resetZonesToDefault() {
+  zones.splice(0, zones.length, ...buildDefaultZoneRows())
+  syncDefaultTotalWater()
+}
+
+function applyEnabledZones(rows) {
+  if (!Array.isArray(rows) || !rows.length) return
+  zones.splice(0, zones.length, ...rows.map(item => {
+    const landArea = Number(item.landArea ?? item.land_area ?? 0)
+    return {
+      zone_id: item.zoneId ?? item.zone_id,
+      zone_name: item.zoneName ?? item.zone_name,
+      land_area: landArea,
+      min_area: Number(item.minArea ?? item.min_area ?? (landArea * 0.75).toFixed(4)),
+      max_area: Number(item.maxArea ?? item.max_area ?? landArea),
+      surface_water_available: Number(item.surfaceWaterAvailable ?? item.surface_water_available ?? 0),
+      groundwater_available: Number(item.groundwaterAvailable ?? item.groundwater_available ?? 0)
+    }
+  }))
+  syncDefaultTotalWater()
+}
+
+function normalizeIrrigationAreas(rows) {
+  return rows
+    .map(item => ({
+      irrigationAreaCode: item.irrigationAreaCode ?? item.irrigation_area_code ?? '',
+      irrigationAreaName: item.irrigationAreaName ?? item.irrigation_area_name ?? item.irrigationAreaCode ?? item.irrigation_area_code ?? ''
+    }))
+    .filter(item => item.irrigationAreaCode)
+}
+
+async function loadEnabledZones() {
+  if (!form.irrigationAreaCode) {
+    zones.splice(0, zones.length)
+    totalWaterCustomized.value = false
+    setDefaultTotalWaterFromZones()
+    return
+  }
+  zoneLoading.value = true
+  zones.splice(0, zones.length)
+  try {
+    const response = await listEnabledZones(form.irrigationAreaCode)
+    const rows = Array.isArray(response?.data) ? response.data : response
+    if (Array.isArray(rows) && rows.length) {
+      applyEnabledZones(rows)
+    } else {
+      resetZonesToDefault()
+      proxy.$modal?.msgWarning?.('未加载到分区数据，已使用页面默认分区')
+    }
+  } catch (err) {
+    resetZonesToDefault()
+    proxy.$modal?.msgWarning?.('分区数据加载失败，已使用页面默认分区')
+  } finally {
+    zoneLoading.value = false
+  }
+}
+
+async function loadIrrigationAreas() {
+  try {
+    const response = await listIrrigationAreas()
+    const rows = Array.isArray(response?.data) ? response.data : response
+    if (Array.isArray(rows) && rows.length) irrigationAreas.value = normalizeIrrigationAreas(rows)
+  } catch (err) {
+    irrigationAreas.value = [{ irrigationAreaCode: DEFAULT_AREA_CODE, irrigationAreaName: DEFAULT_AREA_NAME }]
+  }
+}
+
+async function handleIrrigationAreaChange() {
+  resetResult()
+  totalWaterCustomized.value = false
+  if (!form.irrigationAreaCode) {
+    zones.splice(0, zones.length)
+    setDefaultTotalWaterFromZones()
+    return
+  }
+  await loadEnabledZones()
+}
 
 const submitting = ref(false)
+const zoneLoading = ref(false)
+const totalWaterCustomized = ref(false)
 const result = ref(null)
 const resultError = ref('')
+const irrigationAreas = ref([])
 const objectiveRadarRef = ref(null)
 const weightPieRef = ref(null)
 const cropSummaryRef = ref(null)
@@ -492,7 +647,8 @@ let pareto3dChart = null
 
 const form = reactive({
   apiKey: IRRIGATION_API_KEY,
-  totalWaterAvailable: 0,
+  irrigationAreaCode: '',
+  totalWaterAvailable: null,
   popSize: 80,
   nGen: 60,
   seed: 1,
@@ -505,6 +661,8 @@ const form = reactive({
 
 const canSubmit = computed(() => {
   if (!form.apiKey.trim()) return false
+  if (!form.irrigationAreaCode) return false
+  if (zoneLoading.value) return false
   if (form.totalWaterAvailable <= 0) return false
   if (!zones.every(item => item.land_area > 0 && (item.surface_water_available + item.groundwater_available) > 0)) return false
   if (!crops.every(item =>
@@ -742,6 +900,7 @@ function renderCharts() {
 function buildPayload() {
   return {
     mode: 'water-soil-resource',
+    irrigationAreaCode: form.irrigationAreaCode,
     crops: crops.map(item => ({ ...item })),
     zones: zones.map(item => ({
       zone_id: item.zone_id,
@@ -796,6 +955,9 @@ watch(result, async (val) => {
 })
 
 window.addEventListener('resize', resizeCharts)
+onMounted(() => {
+  loadIrrigationAreas()
+})
 onUnmounted(() => {
   window.removeEventListener('resize', resizeCharts)
   destroyCharts()

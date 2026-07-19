@@ -109,6 +109,14 @@ insert into sys_menu values(2083, '渠段修改', 2080, '3', '', '', '', '', 1, 
 insert into sys_menu values(2084, '渠段删除', 2080, '4', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:canal:remove', '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(2085, '渠段导入', 2080, '5', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:canal:import', '#', 'admin', current_timestamp, '', null, '');
 
+-- 分区数据管理（农业数据 → 分区数据）
+insert into sys_menu values(2086, '分区数据', 2000, '8', 'zone', 'agriculture/zone/index', '', '', 1, 0, 'C', '0', '0', 'agriculture:zone:list', 'tree-table', 'admin', current_timestamp, '', null, '灌区分区基础数据管理');
+insert into sys_menu values(2087, '分区查询', 2086, '1', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:zone:query', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2088, '分区新增', 2086, '2', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:zone:add', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2089, '分区修改', 2086, '3', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:zone:edit', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2090, '分区删除', 2086, '4', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:zone:remove', '#', 'admin', current_timestamp, '', null, '');
+insert into sys_menu values(2091, '分区导入', 2086, '5', '', '', '', '', 1, 0, 'F', '0', '0', 'agriculture:zone:import', '#', 'admin', current_timestamp, '', null, '');
+
 -- 普通角色（role_id=2）默认授权渠段查询；新增/修改/删除/导入按需开放
 insert into sys_role_menu values(2, 2080);
 insert into sys_role_menu values(2, 2081);

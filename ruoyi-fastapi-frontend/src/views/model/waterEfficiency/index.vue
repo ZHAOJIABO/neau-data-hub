@@ -50,6 +50,23 @@
             <el-form-item label="接口 API Key" required>
               <el-input v-model="form.apiKey" type="password" show-password clearable placeholder="X-Irrigation-Api-Key" />
             </el-form-item>
+            <el-form-item label="灌区选择">
+              <el-select
+                v-model="form.irrigationAreaCode"
+                filterable
+                clearable
+                placeholder="请选择灌区"
+                style="width: 100%"
+                @change="handleIrrigationAreaChange"
+              >
+                <el-option
+                  v-for="item in irrigationAreas"
+                  :key="item.irrigationAreaCode"
+                  :label="item.irrigationAreaName"
+                  :value="item.irrigationAreaCode"
+                />
+              </el-select>
+            </el-form-item>
 
             <el-form-item label="评价年份">
               <el-input-number v-model="form.year" :min="2000" :max="2099" :step="1" style="width: 100%" />
@@ -64,12 +81,15 @@
 
             <div class="zone-table-wrapper">
               <el-table
+                v-loading="zoneLoading"
                 :data="form.zones"
                 border
                 size="small"
                 stripe
                 max-height="480"
                 class="zone-indicator-table"
+                element-loading-text="正在加载灌区分区数据"
+                empty-text="暂无分区数据"
               >
                 <el-table-column prop="zoneId" label="分区" width="80" fixed />
                 <el-table-column label="名称" width="90" fixed>
@@ -314,16 +334,19 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { Promotion, RefreshRight } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 
 import { runWaterEfficiencyEvaluate } from '@/api/model/waterEfficiency'
+import { listEnabledZones, listIrrigationAreas } from '@/api/agriculture/zone'
 
 defineOptions({ name: 'WaterEfficiency' })
 
 const { proxy } = getCurrentInstance()
 const IRRIGATION_API_KEY = import.meta.env.VITE_IRRIGATION_API_KEY || 'irrigation_live_20260605_f2K9mQ7xLp4N8vRb6TzY'
+const DEFAULT_AREA_CODE = 'chahayang'
+const DEFAULT_AREA_NAME = '查哈阳灌区'
 
 const INDICATOR_NAMES = {
   iwue: 'IWUE',
@@ -393,14 +416,17 @@ function buildDefaultZones() {
 
 const form = reactive({
   apiKey: IRRIGATION_API_KEY,
+  irrigationAreaCode: '',
   year: new Date().getFullYear(),
-  zones: buildDefaultZones(),
+  zones: [],
   alpha: 0.5
 })
 
 const submitting = ref(false)
+const zoneLoading = ref(false)
 const result = ref(null)
 const resultError = ref('')
+const irrigationAreas = ref([])
 const gradeChartRef = ref(null)
 const scoreChartRef = ref(null)
 
@@ -413,6 +439,8 @@ const periodResult = computed(() => {
 
 const canSubmit = computed(() => {
   if (!form.apiKey.trim()) return false
+  if (!form.irrigationAreaCode) return false
+  if (zoneLoading.value) return false
   if (!form.zones.length) return false
   return form.zones.every(z => z.zoneId.trim())
 })
@@ -421,8 +449,70 @@ function resetToDefault() {
   form.zones.splice(0, form.zones.length, ...buildDefaultZones())
 }
 
+function applyEnabledZoneNames(rows) {
+  if (!Array.isArray(rows) || !rows.length) return
+  form.zones.splice(0, form.zones.length, ...rows.map((item, i) => ({
+    zoneId: item.zoneId ?? item.zone_id,
+    zoneName: item.zoneName ?? item.zone_name,
+    ...(DEFAULT_ZONE_DATA[i] || DEFAULT_ZONE_DATA[DEFAULT_ZONE_DATA.length - 1])
+  })))
+}
+
+function normalizeIrrigationAreas(rows) {
+  return rows
+    .map(item => ({
+      irrigationAreaCode: item.irrigationAreaCode ?? item.irrigation_area_code ?? '',
+      irrigationAreaName: item.irrigationAreaName ?? item.irrigation_area_name ?? item.irrigationAreaCode ?? item.irrigation_area_code ?? ''
+    }))
+    .filter(item => item.irrigationAreaCode)
+}
+
+async function loadEnabledZonesForArea() {
+  if (!form.irrigationAreaCode) {
+    form.zones.splice(0, form.zones.length)
+    return
+  }
+  zoneLoading.value = true
+  form.zones.splice(0, form.zones.length)
+  try {
+    const response = await listEnabledZones(form.irrigationAreaCode)
+    const rows = Array.isArray(response?.data) ? response.data : response
+    if (Array.isArray(rows) && rows.length) {
+      applyEnabledZoneNames(rows)
+    } else {
+      resetToDefault()
+      proxy.$modal?.msgWarning?.('未加载到分区数据，已使用页面默认分区')
+    }
+  } catch (err) {
+    resetToDefault()
+    proxy.$modal?.msgWarning?.('分区数据加载失败，已使用页面默认分区')
+  } finally {
+    zoneLoading.value = false
+  }
+}
+
+async function loadIrrigationAreas() {
+  try {
+    const response = await listIrrigationAreas()
+    const rows = Array.isArray(response?.data) ? response.data : response
+    if (Array.isArray(rows) && rows.length) irrigationAreas.value = normalizeIrrigationAreas(rows)
+  } catch (err) {
+    irrigationAreas.value = [{ irrigationAreaCode: DEFAULT_AREA_CODE, irrigationAreaName: DEFAULT_AREA_NAME }]
+  }
+}
+
+async function handleIrrigationAreaChange() {
+  resetResult()
+  if (!form.irrigationAreaCode) {
+    form.zones.splice(0, form.zones.length)
+    return
+  }
+  await loadEnabledZonesForArea()
+}
+
 function buildPayload() {
   return {
+    irrigationAreaCode: form.irrigationAreaCode,
     periods: [{
       periodId: String(form.year),
       periodLabel: `${form.year} 年`,
@@ -556,6 +646,9 @@ watch(result, async () => {
 })
 
 window.addEventListener('resize', resizeCharts)
+onMounted(() => {
+  loadIrrigationAreas()
+})
 onUnmounted(() => {
   window.removeEventListener('resize', resizeCharts)
   destroyCharts()

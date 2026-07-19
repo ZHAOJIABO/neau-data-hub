@@ -17,24 +17,6 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
-from module_model.entity.vo.water_soil_resource_vo import DEFAULT_WATER_SOIL_ZONES
-
-
-def _default_zones() -> list['WaterRightZoneInputModel']:
-    """复用现有水土资源模型的默认 14 分区数据。"""
-    out: list[WaterRightZoneInputModel] = []
-    # 局部延迟导入避免类型注解求值时的循环引用
-    cls = globals().get('WaterRightZoneInputModel')
-    if cls is None:
-        return []
-    for item in DEFAULT_WATER_SOIL_ZONES:
-        payload = dict(item)
-        payload.pop('min_area', None)
-        payload.pop('max_area', None)
-        out.append(cls(**payload))
-    return out
-
-
 class WaterRightZoneInputModel(BaseModel):
     """水权交易市场中的分区 Agent 入参。"""
 
@@ -140,9 +122,10 @@ class WaterRightAllocationRequest(BaseModel):
 
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
 
+    irrigation_area_code: str = Field(default='chahayang', description='灌区编码')
     zones: List[WaterRightZoneInputModel] = Field(
-        default_factory=_default_zones,
-        description='灌区分区 Agent 列表',
+        default_factory=list,
+        description='灌区分区 Agent 列表；为空时由接口从数据库加载启用分区',
     )
     crops: List[WaterRightCropInputModel] = Field(
         default_factory=list,
@@ -155,8 +138,6 @@ class WaterRightAllocationRequest(BaseModel):
 
     @model_validator(mode='after')
     def _validate_request(self) -> 'WaterRightAllocationRequest':
-        if not self.zones:
-            raise ValueError('分区列表 zones 不能为空')
         if not self.crops:
             raise ValueError('作物列表 crops 不能为空，前端必须传入作物配置')
         seen = set()

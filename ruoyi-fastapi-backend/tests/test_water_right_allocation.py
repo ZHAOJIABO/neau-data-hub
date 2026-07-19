@@ -269,8 +269,8 @@ class ValidationTest(unittest.TestCase):
             crops=[WaterRightCropInputModel(**c) for c in _make_crops()],
             market=WaterRightMarketInputModel(initial_total_water_m3=4.0e7),
         )
-        # 默认继承水土资源模型 14 分区
-        self.assertEqual(len(req.zones), len(DEFAULT_WATER_SOIL_ZONES))
+        # 接口层会在 zones 为空时从数据库加载启用分区
+        self.assertEqual(req.zones, [])
 
     def test_crops_must_be_non_empty(self):
         with self.assertRaises(ValidationError):

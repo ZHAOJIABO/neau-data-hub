@@ -8,9 +8,12 @@ from typing import Annotated
 
 from fastapi import Body
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.aspect.db_seesion import DBSessionDependency
 from common.aspect.irrigation_auth import irrigation_api_key_dependency
 from common.router import APIRouterPro
+from module_agriculture.service.zone_service import IrrigationZoneService
 from module_model.entity.vo.water_right_allocation_vo import WaterRightAllocationRequest
 from module_model.service.water_right_allocation_service import WaterRightAllocationService
 from utils.log_util import logger
@@ -34,17 +37,24 @@ async def solve_water_right_allocation(
         WaterRightAllocationRequest,
         Body(description='水权分配与市场博弈 JSON 请求体'),
     ],
+    query_db: Annotated[AsyncSession, DBSessionDependency()],
 ) -> JSONResponse:
     """按面积均分初始水权，下层通过拍卖 LP 全局最优出清。"""
+    zones = [item.model_dump(by_alias=False) for item in payload.zones]
+    if not zones:
+        zones = await IrrigationZoneService.list_enabled_for_water_right(
+            query_db, payload.irrigation_area_code
+        )
     logger.info(
-        'water-right-allocation solve request: zones=%s, crops=%s, total_water=%s',
-        len(payload.zones),
+        'water-right-allocation solve request: area=%s, zones=%s, crops=%s, total_water=%s',
+        payload.irrigation_area_code,
+        len(zones),
         len(payload.crops),
         payload.market.initial_total_water_m3,
     )
     market_dict = payload.market.model_dump(by_alias=False)
     data = await WaterRightAllocationService.run_allocation(
-        zones=[item.model_dump(by_alias=False) for item in payload.zones],
+        zones=zones,
         crops=[item.model_dump(by_alias=False) for item in payload.crops],
         market=market_dict,
     )

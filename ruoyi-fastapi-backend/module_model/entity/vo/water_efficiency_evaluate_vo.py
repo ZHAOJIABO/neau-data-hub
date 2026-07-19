@@ -110,6 +110,7 @@ class WaterEfficiencyEvaluateRequest(BaseModel):
 
     model_config = ConfigDict(alias_generator=to_camel, from_attributes=True, populate_by_name=True)
 
+    irrigation_area_code: str = Field(default='chahayang', description='灌区编码')
     periods: List[WaterEfficiencyPeriodInputModel] = Field(
         min_length=1,
         description='历史时段列表，至少传入 1 个时段',
