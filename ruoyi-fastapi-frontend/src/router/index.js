@@ -150,6 +150,19 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/model/water-fertilizer',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/model/waterFertilizer/index'),
+        name: 'WaterFertilizer',
+        meta: { title: '水肥调控模型', icon: 'tree' }
+      }
+    ]
+  },
+  {
     path: '/model/water-right-allocation',
     component: Layout,
     hidden: true,

@@ -16,6 +16,10 @@
             <el-icon><Promotion /></el-icon>
             <span>渠系水动力学</span>
           </router-link>
+          <router-link to="/model/water-fertilizer" class="sibling-link">
+            <el-icon><Promotion /></el-icon>
+            <span>水肥调控</span>
+          </router-link>
         </div>
       </div>
       <div class="agri-page__tags">

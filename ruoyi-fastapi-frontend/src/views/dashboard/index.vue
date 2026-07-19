@@ -303,7 +303,7 @@
           </div>
         </router-link>
 
-        <router-link to="#" class="model-card">
+        <router-link to="/model/water-fertilizer" class="model-card">
           <div class="model-card-icon fert-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M7 21h10M12 21V11M5 7l7-5 7 5M5 7h14v10H5z"/>
