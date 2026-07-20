@@ -66,6 +66,11 @@
         <el-table-column label="耕地面积 ha" prop="landArea" min-width="120" align="right" />
         <el-table-column label="地表水 m³" prop="surfaceWaterAvailable" min-width="140" align="right" />
         <el-table-column label="地下水 m³" prop="groundwaterAvailable" min-width="140" align="right" />
+        <el-table-column label="IWUE" prop="iwue" min-width="90" align="right" />
+        <el-table-column label="WUE kg/m³" prop="waterProductivityKgM3" min-width="110" align="right" />
+        <el-table-column label="BEC 元/m³" prop="benefitYuanPerM3" min-width="110" align="right" />
+        <el-table-column label="保证率" prop="irrigationReliability" min-width="90" align="right" />
+        <el-table-column label="田间效率" prop="fieldEfficiency" min-width="90" align="right" />
         <el-table-column label="最小面积 ha" prop="minArea" min-width="120" align="right" />
         <el-table-column label="最大面积 ha" prop="maxArea" min-width="120" align="right" />
         <el-table-column label="排序" prop="sortOrder" min-width="80" align="center" />
@@ -131,6 +136,46 @@
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
+            <el-form-item label="IWUE" prop="iwue">
+              <el-input-number v-model="form.iwue" :min="0" :max="1" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="WUE (kg/m³)" prop="waterProductivityKgM3">
+              <el-input-number v-model="form.waterProductivityKgM3" :min="0" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="BEC (元/m³)" prop="benefitYuanPerM3">
+              <el-input-number v-model="form.benefitYuanPerM3" :min="0" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="灌溉保证率" prop="irrigationReliability">
+              <el-input-number v-model="form.irrigationReliability" :min="0" :max="1" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="田间水效率" prop="fieldEfficiency">
+              <el-input-number v-model="form.fieldEfficiency" :min="0" :max="1" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="地表水利用率" prop="surfaceWaterUtilization">
+              <el-input-number v-model="form.surfaceWaterUtilization" :min="0" :max="2" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="地下水利用率" prop="groundwaterUtilization">
+              <el-input-number v-model="form.groundwaterUtilization" :min="0" :max="2" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="地下水依赖度" prop="groundwaterDependency">
+              <el-input-number v-model="form.groundwaterDependency" :min="0" :max="1" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
             <el-form-item label="最小面积 (ha)" prop="minArea">
               <el-input-number v-model="form.minArea" :min="0" :precision="4" style="width: 100%" />
             </el-form-item>
@@ -173,7 +218,7 @@
         type="info"
         :closable="false"
         show-icon
-        title="CSV 至少包含 zone_id / zone_name / land_area，可选 irrigation_area_code / irrigation_area_name / surface_water_available / groundwater_available / min_area / max_area / sort_order / status / remark。按 (灌区编码, 分区编号) upsert。"
+        title="CSV 至少包含 zone_id / zone_name / land_area，可选 irrigation_area_code / irrigation_area_name / surface_water_available / groundwater_available / iwue / water_productivity_kg_m3 / benefit_yuan_per_m3 / irrigation_reliability / field_efficiency / surface_water_utilization / groundwater_utilization / groundwater_dependency / min_area / max_area / sort_order / status / remark。按 (灌区编码, 分区编号) upsert。"
         class="mb16"
       />
       <el-upload
@@ -252,6 +297,14 @@ function defaultForm() {
     landArea: 1,
     surfaceWaterAvailable: 0,
     groundwaterAvailable: 0,
+    iwue: 0,
+    waterProductivityKgM3: 0,
+    benefitYuanPerM3: 0,
+    irrigationReliability: 0,
+    fieldEfficiency: 0,
+    surfaceWaterUtilization: 0,
+    groundwaterUtilization: 0,
+    groundwaterDependency: 0,
     minArea: 0,
     maxArea: 1,
     sortOrder: 0,
@@ -320,6 +373,14 @@ function handleUpdate(row) {
     landArea: Number(row.landArea ?? 1),
     surfaceWaterAvailable: Number(row.surfaceWaterAvailable ?? 0),
     groundwaterAvailable: Number(row.groundwaterAvailable ?? 0),
+    iwue: Number(row.iwue ?? 0),
+    waterProductivityKgM3: Number(row.waterProductivityKgM3 ?? 0),
+    benefitYuanPerM3: Number(row.benefitYuanPerM3 ?? 0),
+    irrigationReliability: Number(row.irrigationReliability ?? 0),
+    fieldEfficiency: Number(row.fieldEfficiency ?? 0),
+    surfaceWaterUtilization: Number(row.surfaceWaterUtilization ?? 0),
+    groundwaterUtilization: Number(row.groundwaterUtilization ?? 0),
+    groundwaterDependency: Number(row.groundwaterDependency ?? 0),
     minArea: Number(row.minArea ?? 0),
     maxArea: Number(row.maxArea ?? row.landArea ?? 1),
     sortOrder: Number(row.sortOrder ?? 0),

@@ -373,44 +373,18 @@ const ZONE_NAMES = [
   '二十八方', '联合', '金边', '长吉岗'
 ]
 
-// 各分区模拟指标数据（IWUE, WUE, BEC, IRS, FE, SUR, GWR, GWI）
-// 设计差异化：Z01 红河 / Z08 海洋 — 综合优秀；Z02-Z05 良好；Z06-Z10 合格；Z11-Z14 不合格
-const DEFAULT_ZONE_DATA = [
-  // Z01 红河 — 地表水丰沛、综合表现优秀（贴近阈值 0.70）
-  { iwue: 0.74, waterProductivityKgM3: 3.45, benefitYuanPerM3: 15.5, irrigationReliability: 0.98, fieldEfficiency: 0.97, surfaceWaterUtilization: 0.90, groundwaterUtilization: 0.14, groundwaterDependency: 0.08 },
-  // Z02 万发 — 水源条件好，灌溉保证率高（良好）
-  { iwue: 0.60, waterProductivityKgM3: 2.70, benefitYuanPerM3: 11.5, irrigationReliability: 0.90, fieldEfficiency: 0.90, surfaceWaterUtilization: 0.72, groundwaterUtilization: 0.28, groundwaterDependency: 0.22 },
-  // Z03 金光 — 田间设施完善，WUE 较高（良好）
-  { iwue: 0.58, waterProductivityKgM3: 2.65, benefitYuanPerM3: 10.9, irrigationReliability: 0.87, fieldEfficiency: 0.89, surfaceWaterUtilization: 0.70, groundwaterUtilization: 0.30, groundwaterDependency: 0.25 },
-  // Z04 稻花香 — 水稻主产区，灌溉面积大，保证率高（良好）
-  { iwue: 0.56, waterProductivityKgM3: 2.45, benefitYuanPerM3: 10.2, irrigationReliability: 0.85, fieldEfficiency: 0.87, surfaceWaterUtilization: 0.68, groundwaterUtilization: 0.32, groundwaterDependency: 0.28 },
-  // Z05 发展 — 综合良好（良好边界）
-  { iwue: 0.54, waterProductivityKgM3: 2.30, benefitYuanPerM3: 9.6, irrigationReliability: 0.82, fieldEfficiency: 0.85, surfaceWaterUtilization: 0.65, groundwaterUtilization: 0.35, groundwaterDependency: 0.30 },
-  // Z06 金星 — 中等水平，设施有待改善（合格）
-  { iwue: 0.52, waterProductivityKgM3: 2.15, benefitYuanPerM3: 8.8, irrigationReliability: 0.78, fieldEfficiency: 0.83, surfaceWaterUtilization: 0.60, groundwaterUtilization: 0.40, groundwaterDependency: 0.35 },
-  // Z07 太平湖 — 局部供水不足（合格）
-  { iwue: 0.50, waterProductivityKgM3: 2.05, benefitYuanPerM3: 8.2, irrigationReliability: 0.73, fieldEfficiency: 0.80, surfaceWaterUtilization: 0.55, groundwaterUtilization: 0.45, groundwaterDependency: 0.40 },
-  // Z08 海洋 — 地表水丰富、设施先进、综合表现优秀
-  { iwue: 0.74, waterProductivityKgM3: 3.42, benefitYuanPerM3: 15.1, irrigationReliability: 0.97, fieldEfficiency: 0.96, surfaceWaterUtilization: 0.92, groundwaterUtilization: 0.12, groundwaterDependency: 0.06 },
-  // Z09 新立 — 设施条件中等，水源相对紧张（合格）
-  { iwue: 0.55, waterProductivityKgM3: 2.38, benefitYuanPerM3: 9.9, irrigationReliability: 0.80, fieldEfficiency: 0.86, surfaceWaterUtilization: 0.62, groundwaterUtilization: 0.38, groundwaterDependency: 0.33 },
-  // Z10 丰收 — 农艺管理水平良好（合格边界）
-  { iwue: 0.58, waterProductivityKgM3: 2.55, benefitYuanPerM3: 10.6, irrigationReliability: 0.86, fieldEfficiency: 0.88, surfaceWaterUtilization: 0.68, groundwaterUtilization: 0.32, groundwaterDependency: 0.27 },
-  // Z11 二十八方 — 面积最大，水源分布不均（不合格）
-  { iwue: 0.42, waterProductivityKgM3: 1.55, benefitYuanPerM3: 5.0, irrigationReliability: 0.50, fieldEfficiency: 0.68, surfaceWaterUtilization: 0.32, groundwaterUtilization: 0.68, groundwaterDependency: 0.65 },
-  // Z12 联合 — 地下水利用率偏高，保证率偏低（不合格）
-  { iwue: 0.40, waterProductivityKgM3: 1.45, benefitYuanPerM3: 4.5, irrigationReliability: 0.45, fieldEfficiency: 0.65, surfaceWaterUtilization: 0.28, groundwaterUtilization: 0.72, groundwaterDependency: 0.70 },
-  // Z13 金边 — 综合水平较差，需要重点改进（不合格）
-  { iwue: 0.38, waterProductivityKgM3: 1.30, benefitYuanPerM3: 3.8, irrigationReliability: 0.40, fieldEfficiency: 0.62, surfaceWaterUtilization: 0.22, groundwaterUtilization: 0.78, groundwaterDependency: 0.76 },
-  // Z14 长吉岗 — 面积大、水源条件复杂，综合效率最低（不合格）
-  { iwue: 0.35, waterProductivityKgM3: 1.20, benefitYuanPerM3: 3.2, irrigationReliability: 0.35, fieldEfficiency: 0.58, surfaceWaterUtilization: 0.18, groundwaterUtilization: 0.82, groundwaterDependency: 0.82 }
-]
-
 function buildDefaultZones() {
   return ZONE_NAMES.map((name, i) => ({
     zoneId: `Z${String(i + 1).padStart(2, '0')}`,
     zoneName: name,
-    ...DEFAULT_ZONE_DATA[i]
+    iwue: 0,
+    waterProductivityKgM3: 0,
+    benefitYuanPerM3: 0,
+    irrigationReliability: 0,
+    fieldEfficiency: 0,
+    surfaceWaterUtilization: 0,
+    groundwaterUtilization: 0,
+    groundwaterDependency: 0
   }))
 }
 
@@ -454,7 +428,14 @@ function applyEnabledZoneNames(rows) {
   form.zones.splice(0, form.zones.length, ...rows.map((item, i) => ({
     zoneId: item.zoneId ?? item.zone_id,
     zoneName: item.zoneName ?? item.zone_name,
-    ...(DEFAULT_ZONE_DATA[i] || DEFAULT_ZONE_DATA[DEFAULT_ZONE_DATA.length - 1])
+    iwue: Number(item.iwue) || 0,
+    waterProductivityKgM3: Number(item.waterProductivityKgM3 ?? item.water_productivity_kg_m3) || 0,
+    benefitYuanPerM3: Number(item.benefitYuanPerM3 ?? item.benefit_yuan_per_m3) || 0,
+    irrigationReliability: Number(item.irrigationReliability ?? item.irrigation_reliability) || 0,
+    fieldEfficiency: Number(item.fieldEfficiency ?? item.field_efficiency) || 0,
+    surfaceWaterUtilization: Number(item.surfaceWaterUtilization ?? item.surface_water_utilization) || 0,
+    groundwaterUtilization: Number(item.groundwaterUtilization ?? item.groundwater_utilization) || 0,
+    groundwaterDependency: Number(item.groundwaterDependency ?? item.groundwater_dependency) || 0
   })))
 }
 

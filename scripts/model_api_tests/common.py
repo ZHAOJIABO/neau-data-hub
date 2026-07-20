@@ -104,11 +104,24 @@ def post_json(path: str, payload: dict[str, Any], *, auth: str = "irrigation", t
     return _open_json(req, timeout)
 
 
-def get_json(path: str, params: dict[str, Any] | None = None, *, timeout: int = 120) -> dict[str, Any]:
+def get_json(
+    path: str,
+    params: dict[str, Any] | None = None,
+    *,
+    auth: str = "irrigation",
+    timeout: int = 120,
+) -> dict[str, Any]:
     url = f"{BASE_URL}{path}"
     if params:
         url = f"{url}?{parse.urlencode(params)}"
-    req = request.Request(url, headers={"X-Irrigation-Api-Key": IRRIGATION_API_KEY}, method="GET")
+    headers = {}
+    if auth == "irrigation":
+        headers["X-Irrigation-Api-Key"] = IRRIGATION_API_KEY
+    elif auth == "token":
+        if not AUTH_TOKEN:
+            raise SystemExit("AUTH_TOKEN is required for this endpoint.")
+        headers["Authorization"] = AUTH_TOKEN
+    req = request.Request(url, headers=headers, method="GET")
     return _open_json(req, timeout)
 
 
